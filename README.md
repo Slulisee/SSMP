@@ -30,6 +30,12 @@ Version 0.1 is the first working desktop/host milestone. Read [RELEASE-CHECKLIST
 
 **Space** plays/pauses; **Left/Right** seek five seconds when a text field is not focused. **Escape** leaves fullscreen. Use a track's **…** menu for play next, queue, metadata, playlists, and offline downloads. Audio continues while the window is inactive. Operating-system media keys, tray behavior and mobile background services are separate release gates.
 
+The bottom player centers Play/Pause and its related controls, places volume at the far right, and gives the seek bar its own row across almost the full window width. At smaller sizes, compact labels and an action menu keep the controls accessible. See [CHANGELOG.md](CHANGELOG.md) for interface updates.
+
+![SSMP desktop interface with centered controls and a wide seek bar](docs/images/player-desktop.png)
+
+The [compact window capture](docs/images/player-compact.png) shows the same player at 1000 × 720. Both captures use generated demonstration media.
+
 ## Hosting and imports
 
 - [Hosting guide](docs/HOSTING.md): Windows, headless Linux build, users, LAN/Tailscale, backups and diagnostics.

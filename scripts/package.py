@@ -33,7 +33,7 @@ def archive(output,entries):
     print(f'ZIP_CRC_OK={output.name}',flush=True)
 
 assert (APP/'SSMP.exe').is_file()
-for name in ['README.md','SPECIFICATION.md','RELEASE-CHECKLIST.md','LICENSE','VERIFICATION.txt']:
+for name in ['README.md','CHANGELOG.md','SPECIFICATION.md','RELEASE-CHECKLIST.md','LICENSE','VERIFICATION.txt']:
     copy(ROOT/name,APP/name)
 shutil.copytree(ROOT/'docs',APP/'docs',dirs_exist_ok=True)
 evidence=['native-results.json','native-ui-final-results.json','native-tests.log','native-ui-final.log','core-tests-final.log','change-results.json','downloader-e2e.json','downloader-settings.json','antivirus-scan.log','antivirus-downloader.log']
@@ -86,7 +86,7 @@ for p in sum_files+[DOWN/'SHA256SUMS.txt']:
 archive(DIST/'SSYTDLP-with-SSMP-windows-x64.zip',down_entries)
 
 source=[]
-for name in ['Cargo.toml','Cargo.lock','build.rs','README.md','SPECIFICATION.md','RELEASE-CHECKLIST.md','LICENSE','ROLLBACK.sh','CHANGES.diff','VERIFICATION.txt','.gitignore','.gitattributes']:
+for name in ['Cargo.toml','Cargo.lock','build.rs','README.md','CHANGELOG.md','SPECIFICATION.md','RELEASE-CHECKLIST.md','LICENSE','ROLLBACK.sh','CHANGES.diff','VERIFICATION.txt','.gitignore','.gitattributes']:
     source.append((ROOT/name,Path('SSMP-source')/name))
 for folder in ['src','assets','docs','scripts','.github','SSYTDLP/source','work/baseline/SSYTDLP']:
     source.extend((p,Path('SSMP-source')/p.relative_to(ROOT)) for p in files(ROOT/folder))

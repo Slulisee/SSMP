@@ -17,6 +17,8 @@ The desktop uses a native Rust UI. libmpv renders to an OpenGL framebuffer textu
 
 Media IDs are durable library keys initially derived from file size plus first/last 128 KiB SHA-256 sampling. This is a fast change/move fingerprint, not an audio fingerprint, whole-file cryptographic verification or a deduplication guarantee. A separate current fingerprint allows a known file to change while retaining its ID. Manual relinking retains user data. Acoustic matching, tag-independent identity and multiple physical locations per recording are future work.
 
+The bottom player anchors its transport controls to the window center, volume to the right edge, and seeking to a separate full-width row. Set egui's `slider_width` on the slider's own UI scope: `add_sized` alone does not stretch the rail. Centered column/row helpers align page content; card rows allocate an explicit size for each card. Keep the available height intact in centered columns so video and scrolling can measure their viewport correctly. For visual checks, `SSMP_SMOKE_SIZE=1000x720` selects a smaller native window only when using the existing `--smoke-path` capture mode.
+
 SQLite uses WAL and busy timeouts. Profile updates use optimistic revisions and an immediate transaction. A stale remote save returns 409. Never add silent last-writer-wins behavior without a designed merge policy. Offline download identity currently checks size and the same sampled fingerprint; transport uses HTTPS when an HTTPS host is configured. Downloads commit only after verification; interrupted temporary files are removed.
 
 ## API v1
