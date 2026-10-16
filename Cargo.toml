@@ -1,0 +1,44 @@
+[package]
+name = "ssmp"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Slulisee's Simple Music / Streaming Player"
+default-run = "ssmp-desktop"
+
+[[bin]]
+name = "ssmp-desktop"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+eframe = { version = "0.33.3", optional = true, default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+egui_extras = { version = "0.33.3", optional = true, features = ["image"] }
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.38", features = ["bundled"] }
+sha2 = "0.10"
+hex = "0.4"
+walkdir = "2"
+libloading = "0.8"
+rfd = { version = "0.17.2", optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+tiny_http = "0.12"
+url = "2"
+quick-xml = "0.39"
+argon2 = "0.5"
+rand = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:eframe", "dep:egui_extras", "dep:image", "dep:rfd"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

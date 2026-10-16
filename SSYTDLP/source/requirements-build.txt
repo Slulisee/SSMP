@@ -1,0 +1,4 @@
+pyinstaller==6.19.0
+pillow==12.3.0
+mutagen==1.48.1
+syncedlyrics==1.0.1

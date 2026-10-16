@@ -1,0 +1,31 @@
+name: Build SSYTDLP
+permissions:
+  contents: read
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r source/requirements-build.txt
+      - name: Provision nightly and Deno
+        run: python source/prepare_tools.py
+      - name: Unit tests
+        run: python -m unittest discover -s source -p 'test_*.py' -v
+      - name: Build native GUI
+        run: python source/build.py
+      - name: Package native build
+        run: python source/package_native.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SSYTDLP-${{ runner.os }}-${{ runner.arch }}
+          path: native-artifacts/

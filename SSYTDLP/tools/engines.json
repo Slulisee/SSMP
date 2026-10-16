@@ -1,0 +1,23 @@
+{
+  "yt-dlp": {
+    "version": "2026.10.10.233141",
+    "sha256": "e7cafc44db8aa433da8dd78303b9157f2c1dd509c4cbfcd8418081b7e1d26a7a",
+    "source": "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.10.10.233141/yt-dlp.exe",
+    "channel": "nightly"
+  },
+  "deno": {
+    "version": "2.9.7",
+    "sha256": "e020f3e232bd16e33768dee528e5983349c962952051ced0a5d58ad42f5d9b33",
+    "source": "https://github.com/denoland/deno/releases/tag/v2.9.7"
+  },
+  "ffmpeg": {
+    "version": "9.0.2 essentials",
+    "sha256": "3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec",
+    "source": "https://www.gyan.dev/ffmpeg/builds/"
+  },
+  "ffprobe": {
+    "version": "9.0.2 essentials",
+    "sha256": "f0d36ecbbdd3bcfac3efa078c96c7271c2e68b3810595552ac3b7f17e9a65c52",
+    "source": "https://www.gyan.dev/ffmpeg/builds/"
+  }
+}
