@@ -60,7 +60,7 @@ pub fn launch(root: PathBuf, smoke: bool, smoke_page: Option<String>) -> Result<
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_icon(icon)
-            .with_title("SSMP — your collection, your rules")
+            .with_title(format!("SSMP — {}", ssmp::APP_NAME))
             .with_inner_size([1440., 920.])
             .with_min_inner_size([1000., 650.]),
         renderer: eframe::Renderer::Glow,
@@ -839,7 +839,8 @@ impl App {
                         .size(32.)
                         .strong()
                         .color(self.accent()),
-                );
+                )
+                .on_hover_text(ssmp::APP_NAME);
                 ui.label(
                     RichText::new("YOUR COLLECTION. YOUR RULES.")
                         .size(9.)
@@ -1175,7 +1176,7 @@ impl App {
             let result = (|| -> Result<_> {
                 let client = reqwest::blocking::Client::builder()
                     .timeout(Duration::from_secs(15))
-                    .user_agent("SSMP/0.1 (personal music player)")
+                    .user_agent("SSMP/0.1 (Slulisee's Simple Media Player)")
                     .build()?;
                 let v: serde_json::Value = client
                     .get("https://lrclib.net/api/get")
@@ -2083,7 +2084,7 @@ impl App {
     fn dialogs(&mut self, ctx: &egui::Context) {
         if self.show_welcome {
             egui::Window::new("Welcome to SSMP").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER,[0.,0.]).default_width(460.).show(ctx,|ui|{
-                ui.label(RichText::new("Make yourself at home.").size(30.).strong());ui.add_space(12.);ui.label("Your music and videos work locally. Connect a personal server whenever you want. There is no account to create for local playback.");ui.add_space(18.);
+                ui.label(RichText::new(ssmp::APP_NAME).size(22.).strong());ui.add_space(12.);ui.label(RichText::new("Make yourself at home.").size(30.).strong());ui.add_space(12.);ui.label("Your music and videos work locally. Connect a personal server whenever you want. There is no account to create for local playback.");ui.add_space(18.);
                 ui.checkbox(&mut self.state.preferences.history,"Remember listening history on this device");ui.checkbox(&mut self.state.preferences.recommendations,"Build my personal top-song mixes");ui.label(RichText::new("You can change these independently in Settings. Nothing is sent to a cloud account.").small().weak());ui.add_space(20.);
                 ui.horizontal(|ui|{if ui.button("Add my first folder").clicked(){self.show_welcome=false;self.state.onboarding=true;self.changed();self.add_folder();}if ui.button("Explore first").clicked(){self.show_welcome=false;self.state.onboarding=true;self.changed();}});
             });

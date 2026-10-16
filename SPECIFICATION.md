@@ -1,6 +1,6 @@
 # SSMP — product specification
 
-Slulisee's Simple Music / Streaming Player. Agreed product direction, 2026-10-16.
+Slulisee's Simple Media Player (SSMP). Agreed product direction, 2026-10-16.
 
 ## Product promise
 

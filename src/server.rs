@@ -126,7 +126,7 @@ fn handle(mut request: Request, root: &Path, failures: Failures) {
         json(
             request,
             200,
-            serde_json::json!({"name":"SSMP","version":env!("CARGO_PKG_VERSION"),"api":1}),
+            serde_json::json!({"name":"SSMP","full_name":crate::APP_NAME,"version":env!("CARGO_PKG_VERSION"),"api":1}),
         );
         return;
     }

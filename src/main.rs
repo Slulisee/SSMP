@@ -21,12 +21,13 @@ fn run() -> Result<()> {
         .unwrap_or_else(ssmp::data_dir);
     let store = Store::open(&root)?;
     if args.iter().any(|a| a == "--version") {
-        println!("SSMP {}", env!("CARGO_PKG_VERSION"));
+        println!("SSMP {} — {}", env!("CARGO_PKG_VERSION"), ssmp::APP_NAME);
         return Ok(());
     }
     if args.iter().any(|a| a == "--help") {
         println!(
-            "SSMP\n  --data DIRECTORY\n  --scan PATH\n  --serve [--bind 127.0.0.1:4534]\n  --add-user NAME --password-env VARIABLE [--admin]\n  --self-test MEDIA\n  --import MANIFEST\n  --backup DESTINATION\n  --smoke-path MEDIA [--smoke-page PAGE]"
+            "SSMP — {}\n  --data DIRECTORY\n  --scan PATH\n  --serve [--bind 127.0.0.1:4534]\n  --add-user NAME --password-env VARIABLE [--admin]\n  --self-test MEDIA\n  --import MANIFEST\n  --backup DESTINATION\n  --smoke-path MEDIA [--smoke-page PAGE]",
+            ssmp::APP_NAME
         );
         return Ok(());
     }

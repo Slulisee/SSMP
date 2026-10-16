@@ -3,7 +3,7 @@ name = "ssmp"
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
-description = "Slulisee's Simple Music / Streaming Player"
+description = "Slulisee's Simple Media Player"
 default-run = "ssmp-desktop"
 
 [[bin]]

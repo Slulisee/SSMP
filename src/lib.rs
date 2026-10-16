@@ -6,6 +6,8 @@ pub mod server;
 pub mod store;
 
 use std::path::PathBuf;
+pub const APP_NAME: &str = env!("CARGO_PKG_DESCRIPTION");
+
 pub fn data_dir() -> PathBuf {
     if let Some(p) = std::env::var_os("SSMP_DATA_DIR") {
         return p.into();

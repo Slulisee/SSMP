@@ -86,7 +86,7 @@ for p in sum_files+[DOWN/'SHA256SUMS.txt']:
 archive(DIST/'SSYTDLP-with-SSMP-windows-x64.zip',down_entries)
 
 source=[]
-for name in ['Cargo.toml','Cargo.lock','build.rs','README.md','SPECIFICATION.md','RELEASE-CHECKLIST.md','LICENSE','ROLLBACK.sh','CHANGES.diff','VERIFICATION.txt','.gitignore']:
+for name in ['Cargo.toml','Cargo.lock','build.rs','README.md','SPECIFICATION.md','RELEASE-CHECKLIST.md','LICENSE','ROLLBACK.sh','CHANGES.diff','VERIFICATION.txt','.gitignore','.gitattributes']:
     source.append((ROOT/name,Path('SSMP-source')/name))
 for folder in ['src','assets','docs','scripts','.github','SSYTDLP/source','work/baseline/SSYTDLP']:
     source.extend((p,Path('SSMP-source')/p.relative_to(ROOT)) for p in files(ROOT/folder))

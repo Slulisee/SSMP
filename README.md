@@ -1,6 +1,6 @@
 # SSMP
 
-**Slulisee's Simple Music / Streaming Player** — your collection, your rules.
+**Slulisee's Simple Media Player (SSMP)** — your collection, your rules.
 
 A native, local-first music and video player with an optional personal media host. No account is required for local playback. No advertisements, subscriptions, or mandatory online services.
 
