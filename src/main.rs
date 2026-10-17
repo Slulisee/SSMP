@@ -26,7 +26,7 @@ fn run() -> Result<()> {
     }
     if args.iter().any(|a| a == "--help") {
         println!(
-            "SSMP — {}\n  --data DIRECTORY\n  --scan PATH\n  --serve [--bind 127.0.0.1:4534]\n  --add-user NAME --password-env VARIABLE [--admin]\n  --self-test MEDIA\n  --import MANIFEST\n  --backup DESTINATION\n  --smoke-path MEDIA [--smoke-page PAGE]",
+            "SSMP — {}\n  --data DIRECTORY\n  --scan PATH\n  --watch DIRECTORY --serve [--bind 127.0.0.1:4534]\n  --serve [--bind 127.0.0.1:4534]\n  --add-user NAME --password-env VARIABLE [--admin]\n  --self-test MEDIA\n  --import MANIFEST\n  --enrich MEDIA_ID\n  --backup DESTINATION\n  --smoke-path MEDIA [--smoke-page PAGE]",
             ssmp::APP_NAME
         );
         return Ok(());
@@ -51,6 +51,40 @@ fn run() -> Result<()> {
     if let Some(path) = value(&args, "--backup") {
         store.backup(&PathBuf::from(path))?;
         println!("Backup saved");
+        return Ok(());
+    }
+    if let Some(path) = value(&args, "--watch") {
+        let path = std::fs::canonicalize(path).context("Watch folder is unavailable")?;
+        if !path.is_dir() {
+            anyhow::bail!("Choose a watch folder");
+        }
+        let mut state = store.state("local")?;
+        let path = path.to_string_lossy().into_owned();
+        if !state.roots.contains(&path) {
+            state.roots.push(path);
+        }
+        state.preferences.watch_folders = true;
+        store.save_state("local", &state)?;
+    }
+    #[cfg(feature = "desktop")]
+    if let Some(path) = value(&args, "--playback-regression") {
+        ssmp::player::interaction_test(&path)?;
+        return Ok(());
+    }
+    #[cfg(feature = "desktop")]
+    if let Some(path) = value(&args, "--music-video-test") {
+        ssmp::player::music_video_test(
+            &path,
+            &value(&args, "--video").context("Provide --video FILE")?,
+        )?;
+        return Ok(());
+    }
+    if let Some(id) = value(&args, "--enrich") {
+        let media = store.get(&id)?.context("Unknown media")?;
+        let online = ssmp::metadata::enrich(&store, &media)?;
+        let merged = ssmp::metadata::merge_missing(&media, &online);
+        store.put(&merged)?;
+        println!("{}", serde_json::to_string_pretty(&merged)?);
         return Ok(());
     }
     #[cfg(feature = "desktop")]
@@ -105,7 +139,10 @@ fn main() {
     if let Err(e) = run() {
         let message = format!("SSMP: {e:#}");
         eprintln!("{message}");
-        let root = ssmp::data_dir();
+        let args: Vec<_> = std::env::args().collect();
+        let root = value(&args, "--data")
+            .map(PathBuf::from)
+            .unwrap_or_else(ssmp::data_dir);
         let _ = std::fs::create_dir_all(&root);
         let _ = std::fs::write(root.join("last-error.txt"), message);
         std::process::exit(1)

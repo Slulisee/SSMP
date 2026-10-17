@@ -75,6 +75,34 @@ pub fn serve(root: PathBuf, bind: &str) -> Result<()> {
     let _ = Store::open(&root)?;
     let server = tiny_http::Server::http(bind).map_err(|e| anyhow::anyhow!(e.to_string()))?;
     println!("SSMP host listening at http://{}", server.server_addr());
+    // Host-owned local preferences are separate from every authenticated user's
+    // profile. File discovery never blocks streaming/request workers.
+    let watch_root = root.clone();
+    std::thread::spawn(move || {
+        let mut signature = 0;
+        loop {
+            if let Ok(store) = Store::open(&watch_root) {
+                if let Ok(state) = store.state("local") {
+                    if state.preferences.watch_folders && !state.roots.is_empty() {
+                        let roots: Vec<_> = state.roots.iter().map(PathBuf::from).collect();
+                        let current = crate::library::folder_signature(&roots);
+                        if current != signature {
+                            match crate::library::scan(&store, &roots) {
+                                Ok(r) => {
+                                    signature = current;
+                                    if r.added > 0 {
+                                        println!("Watch: {} added", r.added);
+                                    }
+                                }
+                                Err(e) => eprintln!("Watch: {e}"),
+                            }
+                        }
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        }
+    });
     let failures: Failures = Default::default();
     let count = Arc::new(AtomicUsize::new(0));
     let mut last_inbox = std::time::Instant::now();
@@ -265,6 +293,10 @@ fn handle(mut request: Request, root: &Path, failures: Failures) {
                 old.season = edit.season;
                 old.episode = edit.episode;
                 old.lyrics = edit.lyrics;
+                old.genre = edit.genre;
+                old.album_artist = edit.album_artist;
+                old.release_date = edit.release_date;
+                old.track = edit.track;
                 old.locked = true;
                 store.put(&old)?;
                 old.path.clear();

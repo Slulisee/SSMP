@@ -1,9 +1,9 @@
 [package]
 name = "ssmp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
-description = "Slulisee's Simple Media Player"
+description = "Slulisee's Simple Music Player"
 default-run = "ssmp-desktop"
 
 [[bin]]
@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"
-eframe = { version = "0.33.3", optional = true, default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+eframe = { version = "0.33.3", optional = true, default-features = false, features = ["default_fonts", "glow", "wgpu", "x11", "wayland"] }
 egui_extras = { version = "0.33.3", optional = true, features = ["image"] }
 image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
 serde = { version = "1", features = ["derive"] }
@@ -29,13 +29,21 @@ url = "2"
 quick-xml = "0.39"
 argon2 = "0.5"
 rand = "0.8"
+egui_software_backend = { version = "=0.0.2", optional = true, default-features = false, features = ["std"] }
+egui-winit = { version = "0.33.3", optional = true, default-features = false }
+winit = { version = "0.30", optional = true }
+softbuffer = { version = "0.4", optional = true }
+bytemuck = { version = "1", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+wgpu = { version = "27", optional = true, default-features = false, features = ["dx12", "wgsl"] }
 
 [dev-dependencies]
 tempfile = "3"
 
 [features]
 default = ["desktop"]
-desktop = ["dep:eframe", "dep:egui_extras", "dep:image", "dep:rfd"]
+desktop = ["dep:eframe", "dep:egui_extras", "dep:image", "dep:rfd", "dep:wgpu", "dep:egui_software_backend", "dep:egui-winit", "dep:winit", "dep:softbuffer", "dep:bytemuck"]
 
 [profile.release]
 opt-level = 3

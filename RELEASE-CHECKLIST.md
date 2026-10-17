@@ -1,38 +1,24 @@
-# SSMP 0.1 release status
+# SSMP 0.2 release status
 
-This is a working Windows development milestone. The complete product remains in development. The specification records the intended first release and later modules; this file records the delivered boundary.
+This release is a runnable Windows music-player update. The accepted scope is in [the specification](docs/MUSIC-0.2-SPEC.md), with operation in [the music guide](docs/MUSIC-GUIDE.md). Exact commands and exit results accompany the local delivery in MUSIC-VERIFICATION.txt and qa/ evidence.
 
-## Implemented and exercised on Windows x64
+## Implemented
 
-- Native desktop, persistent SQLite collection, recursive manual scans, search, separate music/video views, album playback, favorites and playlists.
-- Metadata probing with ffprobe, embedded and adjacent metadata, persistent manual overrides, stable identity after an unchanged file moves, previewed JSON season imports.
-- libmpv audio, seek, OpenGL video, subtitle/audio selection and two simultaneous subtitle languages. Generated FLAC, MP3, Opus, WAV and MKV fixtures play and advance. Audible output through a physical device still needs human review: automated playback uses a null audio output.
-- M3U/M3U8, PLS, XSPF and iTunes XML parsing, unresolved entry preservation and M3U8 export. Imports match available local paths; they do not automatically acquire absent songs.
-- Adjacent/embedded lyrics, timestamped LRC and offset, manual import/editing. LRCLIB lookup is implemented and optional; live provider availability/results have not been validated.
-- Saved queue, shuffle/repeat, configurable music/video resume, independent history and top-song display. No automatic playback on launch.
-- Themes, accents, density, scale, lyrics/queue panels and preference export/import. Five actual native windows were captured and visually reviewed.
-- Owner-created host accounts, Argon2id credentials, expiring/revocable sessions, independent profiles, owner metadata editing, authenticated range/HEAD streaming, stale revision rejection and verified offline file copying.
-- SSYTDLP opt-in completed-download handoff, atomic inbox claiming, host and GUI inbox polling, failed-manifest retention. Actual bundled yt-dlp/FFmpeg downloaded a generated local media fixture and published a manifest.
-- A headless feature selection, library backup command, unchanged original downloader hashes and rollback on a disposable copy.
+- Music-focused navigation, artists/albums, music videos, favorites, local/offline libraries and personal hosting. General series/episode/subtitle screens have been removed.
+- Preview-on-drag/seek-on-release, previous/restart threshold, independent shuffle mode, weighted favorite artists, repeat, error recovery, output selection and normalization.
+- Four language catalogs and sixteen themes, accent/scale/density controls, vector icons, animated hover/playing/lyrics states and reduced motion.
+- Cached CPU-rendered interface on Windows, with no GPU device/swapchain, a software-frame music-video path, visible-row rendering, cached filtering and adaptive repaint timers. Explicit GPU diagnostic alternatives remain; Linux/macOS retain their existing OpenGL path.
+- Playlist creation from a song or album, image/description editing, local-song selection, number/album/date/duration columns, sort/search/genre filters, custom-order moves, export and deletion.
+- Local synced/word-timed lyrics, full-screen focus mode, offset and optional LRCLIB search. Linked video can be hidden/restored while music continues.
+- Opt-in measured listening time, playlist-specific time, top songs/artists/genres, daily activity, streaks, busiest UTC hour, missing-genre coverage, clearing and JSON export. Legacy play counters do not become invented hours.
+- Optional cached, rate-spaced MusicBrainz/Cover Art Archive/LRCLIB enrichment and protected manual edits.
+- Background folder watching in the desktop and headless host, plus the existing atomic downloader inbox.
+- Existing authenticated host, profile isolation, Argon2id credentials, expiring/revocable sessions, byte ranges/HEAD, stale-revision rejection, owner metadata boundaries and verified offline copying.
 
-## Antivirus and distribution
+## Verification boundary
 
-The user reported a potential-virus detection and temporarily disabled their protection. The first build disappeared after compilation. Its detection name has not been supplied. The new SSMP binary has ordinary PE version information, manifest and icon. SSYTDLP now uses a visible folder runtime instead of a self-extracting PyInstaller onefile executable; no obfuscator or packer was added.
+Windows native regressions and generated-media UI/playback checks are the local evidence. Physical speaker/headphone output and switching between actual hardware devices need listening review on that hardware. Live metadata-service availability is recorded separately from deterministic matching/cache tests.
 
-A Microsoft Defender custom scan of the assembled SSMP package reported no threats. See `qa/antivirus-scan.log`. This does not resolve the reported Bitdefender/Malwarebytes detection. Retesting both packages with the user's normal protection enabled, identifying any remaining detection and vendor review if necessary are open distribution gates. Packages are unsigned. Code signing requires a publisher certificate; it is not a guarantee against detections.
+The source supports Linux/macOS and a headless build, but native execution on those operating systems is not established by a Windows build or a supplied CI file. Android/iOS clients, system media-key/tray support, crossfade/equalizer DSP, third-party server adapters, online playlist-provider imports and production deployment/load testing remain further work.
 
-## Required before a broad first release
-
-- Physical audio devices, gapless transitions, variable frame rates/HDR, long playback, high DPI/accessibility and broader format/subtitle validation.
-- OS media keys/session integration, close/minimize/tray options and sleep/wake behavior.
-- Large-library profiling, bounded thumbnail cache and virtualized list layout; indexing and HTTP operations run off the UI thread, but some local artwork/database work still needs optimization.
-- Live folder watching, embedded-cover extraction, multiple locations per recording and stronger duplicate matching. Sampled file identity is explicitly documented; it is not an acoustic fingerprint.
-- Managed folders, tag write-back, reversible file operations, richer layouts/navigation, sorting, smart playlists and fuller personal mixes. Current recommendations are a top-song view, not an automatic recommendation engine.
-- Offline playlist membership/metadata reconciliation, automatic cache rules and next-X-unwatched copying. Current playlist download is an explicit sequential batch; local/offline browsing works independently.
-- Better remote conflict resolution, proxy/TLS deployment, LAN/Tailscale installation and load testing. The current server shares one collection with all authenticated users and delegates HTTPS to a proxy/private network.
-- Native Linux/macOS builds, packages and service installation. Source and CI are prepared; neither OS was executed here. Android/iOS and third-party server adapters come later.
-- Reproducible public release automation, complete corresponding-source audit for every bundled native dependency, signing and protected antivirus retesting. License texts, Cargo.lock and pinned runtime source/build links accompany this milestone; public distribution review remains open.
-
-## Later modules
-
-Torrent-client integration, a maintained user-configured-source guide, future-episode monitoring, mobile background services, casting, online series metadata matching and additional import/server adapters remain later modules. No torrent acquisition is included in 0.1.
+The existing portable packages are unsigned. Microsoft Defender results, if present in the delivery evidence, apply to the scanned executable only. Protected Bitdefender/Malwarebytes retesting and signing remain release gates. Runtime license texts and pinned provenance/source links accompany the package.

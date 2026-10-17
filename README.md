@@ -1,60 +1,47 @@
 # SSMP
 
-**Slulisee's Simple Media Player (SSMP)** — your collection, your rules.
+**Slulisee's Simple Music Player** — a native, local-first music player with optional personal hosting. No account, ads or internet connection is needed for local listening.
 
-A native, local-first music and video player with an optional personal media host. No account is required for local playback. No advertisements, subscriptions, or mandatory online services.
-
-This repository contains the **0.1 development milestone source**. Portable Windows packages have been built and tested locally; they are not yet published as GitHub release downloads. For a source checkout, follow **Build from source** below. Remaining release gates are recorded in [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
+Version **0.2.0** brings a music-focused interface guided by the supplied design references, sixteen themes, four languages, artist browsing, richer playlists, measured statistics, full-screen lyrics and optional metadata enrichment. General series/video-library screens have been removed; music videos stay supported.
 
 ## Start on Windows
 
-Open `SSMP.exe` from the extracted portable ZIP (or `dist/SSMP-0.1.0-windows-x64/SSMP.exe` in this workspace), then choose **Add a folder** or drop your music/videos onto the window. Keep `libunwind.dll` and the complete `tools` folder beside the executable: they contain required runtime libraries, the playback engine and metadata reader. The app stores its library in `%LOCALAPPDATA%\SSMP`; use `SSMP.exe --data PATH` for a separate library.
+Extract the complete `SSMP-0.2.0-windows-x64.zip` and open `SSMP.exe`. Keep `libunwind.dll` and `tools/` beside it. Add a folder or drop music into the window. Data is stored in `%LOCALAPPDATA%\SSMP`; `SSMP.exe --data PATH` selects a separate library. Existing libraries migrate using defaults for new fields.
 
-The portable ZIP is `dist/SSMP-0.1.0-windows-x64.zip`. The updated downloader is packaged separately as `dist/SSYTDLP-with-SSMP-windows-x64.zip`. Its existing installation is preserved.
+Source is available here; portable Windows builds are delivered as local artifacts until a GitHub release is published. Current platform and release boundaries are listed in [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
 
-## This milestone
+## Music, your way
 
-- Local audio/video indexing, search, album views, favorites, queue, shuffle and repeat.
-- libmpv audio/video playback, OpenGL video rendering, audio/subtitle-track selection and dual subtitles.
-- Embedded/sidecar lyrics, synchronized LRC, manual edits/import, and optional on-demand LRCLIB lookup.
-- M3U/M3U8, PLS, XSPF and iTunes XML imports with unresolved-entry reporting; M3U8 export.
-- Editable metadata and previewed JSON season/series imports.
-- Independent history, personal top-song view, music resume and video resume controls.
-- Four themes, accent colors, interface scale, compact rows, optional lyrics/queue panels and preference export/import.
-- Authenticated host, individual profiles, shared metadata ownership, range streaming, profile revision checks and offline copying.
-- Optional completed-file SSYTDLP handoff through an atomic inbox manifest.
+- A wide seek rail previews while dragging and seeks once on release. Previous restarts after three seconds; a quick second press goes back. Shuffle toggles without starting a song.
+- Songs, artists and albums; clickable artist/album names, favorite artists with optional shuffle weighting, and album-to-playlist conversion.
+- Playlist pictures/descriptions, add-installed-songs selection, track count, total length, measured playlist listening time, date-added columns, sorting, search filters and custom ordering. Right-click and the three-dot menu share actions.
+- Synced local LRC, enhanced word timing, full-screen lyrics with artwork background, optional online lookup and timing adjustment.
+- Music videos and linked local video, with a picture/audio-only switch that preserves playback.
+- Actual listening seconds/hours, play counts, top songs/artists/genres, daily activity, streaks, busiest hour, genre coverage and JSON export. Measurement is optional and clearable.
+- English, German, Spanish and French; sixteen themes, custom accents, scale, compact rows and reduced motion.
+- Cached CPU window drawing on Windows, visible-row rendering, cached search and selected-track-only queue resolution. Optional GPU diagnostic backends remain available.
+- Optional MusicBrainz/Cover Art Archive/LRCLIB enrichment, protected manual edits, background folder watching, output-device selection and loudness normalization.
+- Authenticated self-hosting, individual profiles, range streaming, revision checks, offline copying and SSYTDLP completed-download handoff.
 
-Version 0.1 is the first working desktop/host milestone. Read [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) for implementation gaps and verified platform boundaries. This is not the completed mobile or full first-release roadmap.
+![SSMP music library](docs/images/player-desktop.png)
 
-## Useful controls
+The [compact capture](docs/images/player-compact.png) uses the same application at 1000 × 720. Screenshots use generated demonstration media.
 
-**Space** plays/pauses; **Left/Right** seek five seconds when a text field is not focused. **Escape** leaves fullscreen. Use a track's **…** menu for play next, queue, metadata, playlists, and offline downloads. Audio continues while the window is inactive. Operating-system media keys, tray behavior and mobile background services are separate release gates.
+## Guides
 
-The bottom player centers Play/Pause and its related controls, places volume at the far right, and gives the seek bar its own row across almost the full window width. At smaller sizes, compact labels and an action menu keep the controls accessible. See [CHANGELOG.md](CHANGELOG.md) for interface updates.
+- [Music guide](docs/MUSIC-GUIDE.md): playback, playlists, lyrics, customization and statistics.
+- [Hosting](docs/HOSTING.md): accounts, LAN/Tailscale, headless hosting and backups.
+- [Imports](docs/IMPORTS.md): local playlists, lyrics and downloader integration.
+- [Architecture](docs/ARCHITECTURE.md), [specification](SPECIFICATION.md), [changelog](CHANGELOG.md), and [third-party notices](docs/THIRD-PARTY.md).
 
-![SSMP desktop interface with centered controls and a wide seek bar](docs/images/player-desktop.png)
+## Build and verify
 
-The [compact window capture](docs/images/player-compact.png) shows the same player at 1000 × 720. Both captures use generated demonstration media.
+Use stable Rust: `cargo build --release --locked` for desktop, or `cargo build --release --locked --no-default-features` for a headless host. Linux/macOS desktop installations need libmpv and ffprobe. Windows portable packages supply the playback runtime. `scripts/build.ps1` supports the local Windows toolchain.
 
-## Hosting and imports
+`cargo test --locked` runs regression tests. `scripts/qa.py`, `scripts/music_playback_qa.py` and `scripts/music_ui_qa.py` use generated media and disposable profiles. `scripts/package_music.py` assembles the Windows/source artifacts from reviewed source. Binaries, credentials, libraries, queues and machine-specific reports stay out of Git.
 
-- [Hosting guide](docs/HOSTING.md): Windows, headless Linux build, users, LAN/Tailscale, backups and diagnostics.
-- [Import guide](docs/IMPORTS.md): playlists, lyrics, season metadata and SSYTDLP integration.
-- [Architecture and API](docs/ARCHITECTURE.md): source map, persistence, native media boundary and maintenance.
-- [Product specification](SPECIFICATION.md): agreed direction, release scope and later modules.
-- [Third-party components](docs/THIRD-PARTY.md): playback runtime provenance, licenses and source links.
-- Local delivery packages contain `VERIFICATION.txt` and selected `qa/` evidence. Generated test libraries, machine-specific reports and binaries are excluded from Git.
+## License and next platforms
 
-## Build from source
+SSMP is GPL-3.0-or-later, without a resale restriction. The independent SSYTDLP code retains its MIT license. Dependencies retain their own licenses and notices.
 
-Install a current stable Rust toolchain. `cargo build --release --locked` builds the desktop. Install libmpv and ffprobe for native Linux/macOS desktop use; the Windows package supplies them. `cargo build --release --locked --no-default-features` builds a host without desktop graphics dependencies. Run `cargo test --locked` for core tests. `scripts/build.ps1` is the Windows helper.
-
-Windows packaging is performed by `scripts/package.py` after a verified native build. CI workflows are supplied for Linux/macOS/Windows; an unexecuted workflow is not a platform test result.
-
-## License
-
-SSMP's original code is **GPL-3.0-or-later**, without a resale restriction. See LICENSE. The independently maintained SSYTDLP source retains its existing **MIT** license; other bundled components retain their own terms and notices.
-
-## Later modules
-
-Torrent acquisition, a maintained user-source setup guide, future-release monitoring, Android/iOS clients, third-party server adapters, richer series pages, managed file organization, importer extensions, and advanced customization remain explicitly tracked roadmap work.
+Linux/macOS native packages, mobile clients, system media-key/tray integration, additional server adapters, advanced DSP/crossfade and expanded import providers remain separate work. See the release checklist for what has actually been executed.

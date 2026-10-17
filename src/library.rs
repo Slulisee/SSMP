@@ -17,6 +17,28 @@ pub fn media_kind(path: &Path) -> Option<&'static str> {
         _ => None,
     }
 }
+/// Polling signature is calculated on the scan worker, not on the audio/UI thread.
+pub fn folder_signature(roots: &[PathBuf]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut files = Vec::new();
+    for root in roots {
+        for entry in walkdir::WalkDir::new(root)
+            .follow_links(false)
+            .into_iter()
+            .flatten()
+        {
+            if entry.file_type().is_file() && media_kind(entry.path()).is_some() {
+                if let Ok(meta) = entry.metadata() {
+                    files.push((entry.path().to_path_buf(), meta.len(), meta.modified().ok()));
+                }
+            }
+        }
+    }
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    files.hash(&mut hash);
+    hash.finish()
+}
 pub fn identity(path: &Path) -> Result<String> {
     let mut file = File::open(path)?;
     let size = file.metadata()?.len();
@@ -90,6 +112,7 @@ pub fn probe(path: &Path) -> Result<Media> {
         series,
         season,
         episode: ep,
+        tag_version: 2,
         ..Default::default()
     };
     if let Ok(result) = crate::quiet_command(crate::tool("ffprobe"))
@@ -151,6 +174,17 @@ pub fn probe(path: &Path) -> Result<Media> {
                 if let Some(album) = tags.get("album") {
                     m.album = album.clone()
                 }
+                m.genre = tags.get("genre").cloned().unwrap_or_default();
+                m.release_date = tags
+                    .get("date")
+                    .or_else(|| tags.get("year"))
+                    .cloned()
+                    .unwrap_or_default();
+                m.album_artist = tags
+                    .get("album_artist")
+                    .or_else(|| tags.get("albumartist"))
+                    .cloned()
+                    .unwrap_or_default();
                 if let Some(lyrics) = tags.get("lyrics").or_else(|| tags.get("unsyncedlyrics")) {
                     m.lyrics = lyrics.clone()
                 }
@@ -219,7 +253,10 @@ pub fn scan(store: &Store, paths: &[PathBuf]) -> Result<ImportReport> {
                     .duration_since(std::time::UNIX_EPOCH)?
                     .as_secs();
                 if let Some(mut old) = store.by_path(&key)? {
-                    if old.size == metadata.len() && old.modified == modified {
+                    if old.size == metadata.len()
+                        && old.modified == modified
+                        && old.tag_version >= 2
+                    {
                         if old.missing {
                             old.missing = false;
                             store.put(&old)?
@@ -227,6 +264,18 @@ pub fn scan(store: &Store, paths: &[PathBuf]) -> Result<ImportReport> {
                         return Ok(false);
                     }
                     let fresh = probe(&p)?;
+                    if old.tag_version < 2 {
+                        if old.genre.is_empty() {
+                            old.genre = fresh.genre.clone();
+                        }
+                        if old.release_date.is_empty() {
+                            old.release_date = fresh.release_date.clone();
+                        }
+                        if old.album_artist.is_empty() {
+                            old.album_artist = fresh.album_artist.clone();
+                        }
+                    }
+                    old.tag_version = 2;
                     old.duration = fresh.duration;
                     old.size = fresh.size;
                     old.modified = fresh.modified;
@@ -238,6 +287,9 @@ pub fn scan(store: &Store, paths: &[PathBuf]) -> Result<ImportReport> {
                         old.album = fresh.album;
                         old.lyrics = fresh.lyrics;
                         old.artwork = fresh.artwork;
+                        old.genre = fresh.genre;
+                        old.release_date = fresh.release_date;
+                        old.album_artist = fresh.album_artist;
                     }
                     store.put(&old)?;
                     return Ok(false);
@@ -479,7 +531,7 @@ pub fn import_playlist(store: &Store, path: &Path) -> Result<Playlist> {
                 let report = scan(store, &[p.clone()])?;
                 if report.errors.is_empty() {
                     if let Some(m) = store.by_path(&fs::canonicalize(p)?.to_string_lossy())? {
-                        playlist.items.push(m.id);
+                        playlist.add(&m.id, crate::now());
                         continue;
                     }
                 }
@@ -553,6 +605,42 @@ pub fn lyrics(text: &str) -> Vec<(f64, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn old_tag_records_are_refreshed_once_without_losing_edits() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("old.wav");
+        wav(&path);
+        let store = Store::open(&dir.path().join("data")).unwrap();
+        let mut m = probe(&path).unwrap();
+        m.tag_version = 0;
+        m.title = "Manual title".into();
+        m.locked = true;
+        store.put(&m).unwrap();
+        scan(&store, &[path.clone()]).unwrap();
+        let migrated = store.get(&m.id).unwrap().unwrap();
+        assert_eq!(migrated.tag_version, 2);
+        assert_eq!(migrated.title, "Manual title");
+        scan(&store, &[path]).unwrap();
+        assert_eq!(store.get(&m.id).unwrap().unwrap().title, "Manual title");
+    }
+    #[test]
+    fn watch_signature_detects_new_and_removed_music() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("music");
+        std::fs::create_dir_all(&root).unwrap();
+        let roots = vec![root.clone()];
+        let before = folder_signature(&roots);
+        wav(&root.join("new.wav"));
+        let after = folder_signature(&roots);
+        assert_ne!(before, after);
+        let store = Store::open(&dir.path().join("data")).unwrap();
+        assert_eq!(scan(&store, &roots).unwrap().added, 1);
+        assert_eq!(folder_signature(&roots), after);
+        std::fs::remove_file(root.join("new.wav")).unwrap();
+        assert_eq!(folder_signature(&roots), before);
+        scan(&store, &roots).unwrap();
+        assert!(store.media().unwrap()[0].missing);
+    }
     fn wav(path: &Path) {
         let mut b = vec![0u8; 44 + 2000];
         b[..4].copy_from_slice(b"RIFF");

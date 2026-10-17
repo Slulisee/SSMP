@@ -1,11 +1,12 @@
 """Black-box tests of the packaged native app; only generated media and disposable data."""
 from pathlib import Path
-import json, os, socket, sqlite3, subprocess, sys, time, urllib.request, urllib.error, shutil
+import json, os, socket, sqlite3, subprocess, sys, time, urllib.request, urllib.error, shutil, tomllib
 
 ROOT=Path(__file__).resolve().parents[1]
 QA=ROOT/'qa'
 RUN=QA/('run-'+str(int(time.time())))
-EXE=ROOT/'dist/SSMP-0.1.0-windows-x64/SSMP.exe'
+VERSION=tomllib.loads((ROOT/'Cargo.toml').read_text())['package']['version']
+EXE=Path(os.environ.get('SSMP_QA_EXE',str(ROOT/f'dist/SSMP-{VERSION}-windows-x64/SSMP.exe')))
 ENV=os.environ.copy();ENV.update(TEMP=str(ROOT/'work/temp'),TMP=str(ROOT/'work/temp'),SSMP_DATA_DIR=str(QA/'diagnostics'))
 ENV['SSMP_QA_PASSWORD']='generated-test-passphrase-2026'
 records=[]
@@ -28,7 +29,7 @@ def http(url,method='GET',data=None,token=None,headers=None):
 def main():
     assert EXE.is_file()
     core=RUN/'core-data'
-    assert 'SSMP 0.1.0' in run('--data',core,'--version')
+    assert f'SSMP {VERSION}' in run('--data',core,'--version')
     scanned=json.loads(run('--data',core,'--scan',QA/'media'))
     assert not scanned['errors'],scanned
     run('--data',core,'--import',QA/'season.json')
@@ -46,7 +47,8 @@ def main():
     sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
     url=f'http://127.0.0.1:{port}'
     log=(QA/'host.log').open('w',encoding='utf-8')
-    host=subprocess.Popen([str(EXE),'--data',str(core),'--serve','--bind',f'127.0.0.1:{port}'],cwd=ROOT,env=ENV,stdout=log,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NO_WINDOW)
+    watch=RUN/'watch';watch.mkdir(parents=True,exist_ok=True)
+    host=subprocess.Popen([str(EXE),'--data',str(core),'--watch',str(watch),'--serve','--bind',f'127.0.0.1:{port}'],cwd=ROOT,env=ENV,stdout=log,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NO_WINDOW)
     try:
         deadline=time.time()+12
         while True:
@@ -88,9 +90,18 @@ def main():
         assert 'PLAYBACK_ADVANCED=true' in out
         out=run('--data',RUN/'offline-client','--download',url,'--username','owner','--password-env','SSMP_QA_PASSWORD','--media-id',chosen['id'])
         offline=Path(out.strip().split('OFFLINE_SAVED=',1)[1]);assert offline.is_file()
+        watched=watch/'Watched.wav'
+        import wave, struct
+        with wave.open(str(watched),'wb')as file:file.setparams((1,2,8000,0,'NONE','not compressed'));file.writeframes(struct.pack('<h',0)*8000)
+        deadline=time.time()+12
+        while len(json.loads(http(url+'/api/v1/library',token=owner)[2]))<6:
+            assert time.time()<deadline,'Host watch folder was not scanned'
+            time.sleep(.3)
+        records.append({'check':'headless host folder watching','result':'PASS'})
+        before_inbox=len(json.loads(http(url+'/api/v1/library',token=owner)[2]))
         for manifest in (QA/'e2e-data/imports').glob('*.json'):shutil.copy2(manifest,core/'imports'/manifest.name)
         deadline=time.time()+8
-        while len(json.loads(http(url+'/api/v1/library',token=owner)[2]))<6:
+        while len(json.loads(http(url+'/api/v1/library',token=owner)[2]))<before_inbox+1:
             assert time.time()<deadline,'Host inbox handoff was not consumed'
             time.sleep(.3)
         assert http(url+'/api/v1/logout','POST',{},owner)[0]==200

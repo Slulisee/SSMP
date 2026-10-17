@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — Music player release
+
+- Restore the name Slulisee's Simple Music Player; keep music videos and remove general series/video UI.
+- Fix seek dragging, previous/restart behavior, shuffle activation and asynchronous playback errors.
+- Add artist/album navigation, favorite-artist shuffle weighting, full-screen synced/word-timed lyrics and video/audio switching.
+- Add playlist pictures/descriptions, song/album creation, local-song selection, date/duration columns, sorting/custom order, shared context menus and measured playlist time.
+- Add measured statistics, genre coverage, activity, export and privacy controls.
+- Add English/German/Spanish/French, sixteen themes, vector icons and reduced motion.
+- Add optional cached metadata enrichment, real output-device selection and desktop/headless folder watching.
+- Resolve the reported Windows desktop slowdown with cached CPU window presentation; bound redraws, virtualize song rows, cache filtering and resolve only the selected queued track.
+
+
 ## Unreleased
 
 ### Interface

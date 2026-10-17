@@ -5,13 +5,13 @@ The desktop player works without hosting or an account. Hosting is optional. All
 ## On Windows
 
 1. Run `SSMP.exe`, add your media folders and wait for indexing to complete.
-2. Open **Your server**. Choose an owner username and a password of at least ten characters. Select **Create owner account**.
-3. For this computer only, retain `127.0.0.1:4534`. To permit LAN/Tailscale connections, enter `0.0.0.0:4534`, then select **Start host**.
-4. On another SSMP desktop client, open **Your server**, enter `http://HOST_ADDRESS:4534`, and sign in. Use the host's LAN or Tailscale address. A browser is not a player client in milestone 0.1.
+2. Open **Sources & server**. Choose an owner username and a password of at least ten characters. Select **Create owner**.
+3. For this computer only, retain `127.0.0.1:4534`. To permit LAN/Tailscale connections, enter `0.0.0.0:4534`, then select **Start server**.
+4. On another SSMP desktop client, open **Sources & server**, enter `http://HOST_ADDRESS:4534`, and sign in. Use the host's LAN or Tailscale address. A browser is not a player client in version 0.2.
 
-The host is a separate process and continues when the player window closes. **Stop this host** stops the process launched by the current window. The log is `host.log` in the data directory. A restart-safe operating-system service is described below; the GUI start button does not install a service.
+The host is a separate process and continues when the player window closes. **Stop server** stops the process launched by the current window. The log is `host.log` in the data directory. A restart-safe operating-system service is described below; the GUI start button does not install a service.
 
-Closing a client does not delete files. Turning off or sleeping the host makes uncached remote media unavailable. Use **Keep offline** on a track or **Download playlist** to retain completed files on a client, then return to **Local library → Offline** if the host is unavailable. Offline state reconciliation and automatic playlist-download rules are release gates still in progress.
+Closing a client does not delete files. Turning off or sleeping the host makes uncached remote media unavailable. Use **Keep offline** on a track or **Keep offline** to retain completed files on a client, then return to **Local library → Offline** if the host is unavailable. Offline state reconciliation and automatic playlist-download rules are release gates still in progress.
 
 ## Build a host without desktop dependencies
 
@@ -72,6 +72,10 @@ This creates a consistent SQLite snapshot. Media files and offline media directo
 
 - Connection refused: check the host process, bind address, address/port and your network access.
 - HTTP 401: verify credentials or sign in again after a token expires.
-- HTTP 409: another client changed the profile. Refresh from the host before making another edit; 0.1 does not silently overwrite concurrent edits.
+- HTTP 409: another client changed the profile. Refresh from the host before making another edit; SSMP does not silently overwrite concurrent edits.
 - Missing tracks: scan the correct folder on the host and confirm that its service account can read it.
 - Playback engine missing: use the complete Windows package; Linux/macOS desktop clients require libmpv installed separately.
+
+## Background folder discovery
+
+Enable **Watch my music folders for changes** on the host desktop, or add `--watch /srv/music` to the headless `--serve` command. The host scans configured local roots on a worker about every five seconds while requests continue. Remote user profiles do not choose host filesystem paths.
