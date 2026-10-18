@@ -1,0 +1,50 @@
+name: Publish an already verified SSMP build
+on:
+  workflow_dispatch:
+    inputs:
+      verified_run_id:
+        description: Completed build run whose Windows and host jobs passed
+        required: true
+      expected_commit:
+        description: Exact reviewed source commit used by that build and draft
+        required: true
+      release_tag:
+        description: Existing draft release tag
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERIFIED_RUN: ${{ inputs.verified_run_id }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Verify source, successful build jobs and unpublished draft
+        run: |
+          [[ "$VERIFIED_RUN" =~ ^[0-9]+$ ]]
+          [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$VERIFIED_RUN" > run.json
+          jq -e --arg commit "$EXPECTED_COMMIT" '.head_sha == $commit and .path == ".github/workflows/build.yml" and .status == "completed"' run.json
+          gh api "repos/$GH_REPO/actions/runs/$VERIFIED_RUN/jobs?filter=latest&per_page=100" > jobs.json
+          jq -e '[.jobs[] | select((.name == "windows" or .name == "host") and .conclusion == "success") | .name] | unique | length == 2' jobs.json
+          gh release view "$RELEASE_TAG" --json isDraft,targetCommitish,tagName > draft.json
+          jq -e --arg commit "$EXPECTED_COMMIT" --arg tag "$RELEASE_TAG" '.isDraft and .targetCommitish == $commit and .tagName == $tag' draft.json
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ inputs.verified_run_id }}
+          github-token: ${{ github.token }}
+          path: release-assets
+          merge-multiple: true
+      - name: Attach verified regular files, then publish
+        run: |
+          while IFS= read -r -d '' asset; do
+            gh release upload "$RELEASE_TAG" "$asset" --clobber
+          done < <(find release-assets -type f -print0)
+          gh release edit "$RELEASE_TAG" --draft=false --latest

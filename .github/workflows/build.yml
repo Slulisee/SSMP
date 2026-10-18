@@ -97,5 +97,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          gh release upload "$RELEASE_TAG" release-assets/*
+          while IFS= read -r -d '' asset; do
+            gh release upload "$RELEASE_TAG" "$asset" --clobber
+          done < <(find release-assets -type f -print0)
           gh release edit "$RELEASE_TAG" --draft=false --latest
