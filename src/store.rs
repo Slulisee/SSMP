@@ -73,6 +73,17 @@ impl Store {
         self.db.execute("INSERT INTO media(id,path,data) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET path=excluded.path,data=excluded.data",params![m.id,m.path,serde_json::to_string(m)?])?;
         Ok(())
     }
+    pub fn put_many(&self, rows: &[Media]) -> Result<()> {
+        let tx = self.db.unchecked_transaction()?;
+        {
+            let mut statement=tx.prepare("INSERT INTO media(id,path,data) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET path=excluded.path,data=excluded.data")?;
+            for m in rows {
+                statement.execute(params![m.id, m.path, serde_json::to_string(m)?])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
     pub fn state(&self, user: &str) -> Result<UserState> {
         let s = self
             .db
@@ -98,13 +109,25 @@ impl Store {
                 r.get(0)
             })
             .optional()?;
-        let rev = previous
+        let previous = previous
             .map(|s| serde_json::from_str::<UserState>(&s))
             .transpose()?
-            .unwrap_or_default()
-            .revision;
+            .unwrap_or_default();
+        let rev = previous.revision;
         if state.revision != rev {
             bail!("State changed on another device; refresh before saving")
+        }
+        // A 0.2 client has no period-detail fields. Preserve those when it
+        // saves ordinary listening changes; an explicit history reset still
+        // clears everything because it also resets stats_since to zero.
+        if state.stats_detail_since == 0 && previous.stats_detail_since > 0 && state.stats_since > 0
+        {
+            state.months = previous.months;
+            state.first_heard = previous.first_heard;
+            state.stats_detail_since = previous.stats_detail_since;
+            if state.lyrics_overrides.is_empty() {
+                state.lyrics_overrides = previous.lyrics_overrides;
+            }
         }
         state.revision += 1;
         tx.execute("INSERT INTO states VALUES(?1,?2) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data",params![user,serde_json::to_string(state)?])?;
@@ -189,6 +212,42 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bulk_metadata_is_atomic_and_legacy_clients_keep_period_details() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = Store::open(dir.path()).unwrap();
+        let first = Media {
+            id: "a".into(),
+            path: "a.wav".into(),
+            title: "Original".into(),
+            ..Default::default()
+        };
+        store.put(&first).unwrap();
+        let changed = Media {
+            title: "Changed".into(),
+            ..first.clone()
+        };
+        let conflicting = Media {
+            id: "b".into(),
+            path: "a.wav".into(),
+            ..Default::default()
+        };
+        assert!(store.put_many(&[changed, conflicting]).is_err());
+        assert_eq!(store.get("a").unwrap().unwrap().title, "Original");
+        let mut state = UserState::default();
+        state.preferences.history = true;
+        state.record_seconds("a", 1., crate::stats::timestamp(2026, 10) + 1);
+        store.save_state("profile", &state).unwrap();
+        let mut old = state.clone();
+        old.months.clear();
+        old.first_heard.clear();
+        old.stats_detail_since = 0;
+        store.compare_save("profile", &mut old).unwrap();
+        assert!(!old.months.is_empty());
+        old.clear_history();
+        store.compare_save("profile", &mut old).unwrap();
+        assert!(old.months.is_empty());
+    }
     #[test]
     fn durable_states_and_history_controls() {
         let d = tempfile::tempdir().unwrap();

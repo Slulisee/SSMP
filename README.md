@@ -2,13 +2,25 @@
 
 **Slulisee's Simple Music Player** — a native, local-first music player with optional personal hosting. No account, ads or internet connection is needed for local listening.
 
-Version **0.2.0** brings a music-focused interface guided by the supplied design references, sixteen themes, four languages, artist browsing, richer playlists, measured statistics, full-screen lyrics and optional metadata enrichment. General series/video-library screens have been removed; music videos stay supported.
+Version **0.3.0** adds monthly/yearly listening wrap-ups, richer measured statistics, batch selection/editing, direct metadata and lyric actions, compact dialogs, stable interface scaling, a Windows installer and verified automatic updates after closing. General series/video-library screens have been removed; music videos stay supported.
 
 ## Start on Windows
 
-Extract the complete `SSMP-0.2.0-windows-x64.zip` and open `SSMP.exe`. Keep `libunwind.dll` and `tools/` beside it. Add a folder or drop music into the window. Data is stored in `%LOCALAPPDATA%\SSMP`; `SSMP.exe --data PATH` selects a separate library. Existing libraries migrate using defaults for new fields.
+Run **SSMP-Windows-AMD64-Setup.exe** from [Releases](https://github.com/Slulisee/SSMP/releases/latest), or extract the complete `SSMP-0.3.0-windows-x64.zip` and open `SSMP.exe`. Keep `libunwind.dll` and `tools/` beside it. Add a folder or drop music into the window. Data is stored in `%LOCALAPPDATA%\SSMP`; `SSMP.exe --data PATH` selects a separate library. Existing libraries migrate using defaults for new fields.
 
-Source is available here; portable Windows builds are delivered as local artifacts until a GitHub release is published. Current platform and release boundaries are listed in [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
+Windows setup and portable artifacts are published after the release checks pass. See [install/update guidance](docs/UPDATES.md). Current platform and release boundaries are listed in [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
+
+## New in 0.3
+
+- Monthly/yearly stories, measured period rankings and replay playlists; detailed coverage is shown for older libraries.
+- Import LRC/text lyrics, search with visible results, and keep lyrics and queue open together.
+- Select multiple tracks and edit only checked fields, add them to playlists or look up their missing information.
+- Scaling applies after release; small/high-scale windows adapt their navigation and transport layout.
+- [Windows updates](docs/UPDATES.md) run after closing, and a [Docker host](docs/DOCKER.md) preserves its data volume.
+
+![Monthly wrap-up with generated demonstration media](docs/images/wrap-up.png)
+
+[Batch editing example](docs/images/batch-edit.png)
 
 ## Music, your way
 
@@ -38,7 +50,7 @@ The [compact capture](docs/images/player-compact.png) uses the same application 
 
 Use stable Rust: `cargo build --release --locked` for desktop, or `cargo build --release --locked --no-default-features` for a headless host. Linux/macOS desktop installations need libmpv and ffprobe. Windows portable packages supply the playback runtime. `scripts/build.ps1` supports the local Windows toolchain.
 
-`cargo test --locked` runs regression tests. `scripts/qa.py`, `scripts/music_playback_qa.py` and `scripts/music_ui_qa.py` use generated media and disposable profiles. `scripts/package_music.py` assembles the Windows/source artifacts from reviewed source. Binaries, credentials, libraries, queues and machine-specific reports stay out of Git.
+`cargo test --locked` runs regression tests. `scripts/qa.py`, `scripts/music_playback_qa.py`, `scripts/music_ui_qa.py` and `scripts/music_v03_qa.py` use generated media and disposable profiles. `scripts/prepare_music_runtime.py`, `scripts/build_music_installer.py` and `scripts/zip_music_runtime.py` assemble the pinned Windows packages. Binaries, credentials, libraries, queues and machine-specific reports stay out of Git.
 
 ## License and next platforms
 

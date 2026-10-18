@@ -4,5 +4,11 @@
   "sha256": "0142058a8d20930f1c086d0c16a593f9e27a8b3fe9d1f4bb3b2ee4a2d5ec994b",
   "upstream_sha256": "0142058a8d20930f1c086d0c16a593f9e27a8b3fe9d1f4bb3b2ee4a2d5ec994b",
   "mpv_source": "https://github.com/mpv-player/mpv/tree/a2cd83c56d",
-  "build_source": "https://github.com/shinchiro/mpv-winbuild-cmake/tree/20261016"
+  "build_source": "https://github.com/shinchiro/mpv-winbuild-cmake/tree/20261016",
+  "ffmpeg": {
+    "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip",
+    "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+    "ffprobe_sha256": "f0d36ecbbdd3bcfac3efa078c96c7271c2e68b3810595552ac3b7f17e9a65c52",
+    "source": "https://github.com/FFmpeg/FFmpeg/commit/946fcce07b"
+  }
 }

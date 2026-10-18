@@ -1,0 +1,13 @@
+services:
+  ssmp:
+    build: .
+    image: ssmp-local:latest
+    restart: unless-stopped
+    ports:
+      - "4534:4534"
+    volumes:
+      - ssmp-data:/data
+      - ${SSMP_MUSIC_FOLDER:-./music}:/music:ro
+    stop_grace_period: 20s
+volumes:
+  ssmp-data:

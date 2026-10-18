@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use ssmp::{library, model::*, player::Player, server::Remote, store::Store};
 use std::{
@@ -8,11 +8,14 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod enhancements;
 mod i18n;
 mod icons;
 mod music_ui;
+mod report_ui;
 mod software_window;
 mod themes;
+mod update_ui;
 
 type TaskResult<T> = std::result::Result<T, String>;
 enum Event {
@@ -22,8 +25,12 @@ enum Event {
     Saved(TaskResult<UserState>),
     Downloaded(TaskResult<Media>),
     Message(TaskResult<String>),
-    Lyrics(TaskResult<(String, String)>),
-    Enriched(TaskResult<Vec<Media>>),
+    Lyrics(TaskResult<(String, String, String)>),
+    Enriched(TaskResult<enhancements::MetadataBatch>),
+    MetadataProgress(usize, usize, String),
+    UpdateChecked(TaskResult<Option<ssmp::updates::Release>>),
+    UpdateProgress(u64, u64),
+    UpdateDownloaded(TaskResult<()>),
     Watched(TaskResult<(ImportReport, u64)>),
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -110,6 +117,8 @@ fn centered_row<R>(
 }
 
 pub fn launch(root: PathBuf, smoke: bool, smoke_page: Option<String>) -> Result<()> {
+    #[cfg(windows)]
+    let _application_guard = ssmp::updates::AppMutex::hold();
     let icon = image::load_from_memory(include_bytes!("../assets/SSMP.png"))?.to_rgba8();
     let icon = egui::IconData {
         width: icon.width(),
@@ -255,6 +264,30 @@ struct App {
     video_frame: Option<egui::TextureHandle>,
     filtered_cache: std::cell::RefCell<Option<(String, std::sync::Arc<Vec<Media>>)>>,
     genre_cache: std::cell::RefCell<Option<std::sync::Arc<std::collections::BTreeSet<String>>>>,
+    scale_preview: Option<f32>,
+    lyrics_pending: Option<String>,
+    metadata_progress: Option<(usize, usize, String)>,
+    metadata_explicit: bool,
+    select_mode: bool,
+    selected_songs: std::collections::BTreeSet<String>,
+    selection_anchor: Option<String>,
+    bulk_edit: Option<enhancements::BulkEdit>,
+    report_kind: u8,
+    update_checked: bool,
+    update_busy: bool,
+    update_manual: bool,
+    update_apply_once: bool,
+    update_status: String,
+    update_progress: Option<(u64, u64)>,
+    update_offer: Option<ssmp::updates::Release>,
+    report_year: u32,
+    report_month: u32,
+    wrap_slide: usize,
+    report_cache: Option<(
+        ssmp::stats::Period,
+        u64,
+        std::sync::Arc<ssmp::stats::Report>,
+    )>,
 }
 impl App {
     fn new(
@@ -415,6 +448,26 @@ impl App {
             video_frame: None,
             filtered_cache: Default::default(),
             genre_cache: Default::default(),
+            scale_preview: None,
+            lyrics_pending: None,
+            metadata_progress: None,
+            metadata_explicit: false,
+            select_mode: false,
+            selected_songs: Default::default(),
+            selection_anchor: None,
+            bulk_edit: None,
+            report_kind: 0,
+            report_year: ssmp::stats::calendar(ssmp::now()).0,
+            report_month: ssmp::stats::calendar(ssmp::now()).1,
+            wrap_slide: 0,
+            report_cache: None,
+            update_checked: false,
+            update_busy: false,
+            update_manual: false,
+            update_apply_once: false,
+            update_status: String::new(),
+            update_progress: None,
+            update_offer: None,
         };
         app.selected_playlist = app.state.playlists.first().map(|p| p.id.clone());
         app.apply_preferences(ctx);
@@ -456,10 +509,10 @@ impl App {
                     "artist" => Page::Artist,
                     "albums" => Page::Albums,
                     "album" => Page::Album,
-                    "stats" => Page::Stats,
-                    "lyrics" => Page::Lyrics,
+                    "stats" | "stats-month" | "stats-year" => Page::Stats,
+                    "lyrics" | "lyrics-queue" => Page::Lyrics,
                     "music" => Page::Music,
-                    "edit" => Page::Music,
+                    "edit" | "bulk" => Page::Music,
                     _ => Page::Home,
                 };
             }
@@ -481,6 +534,14 @@ impl App {
             if let Ok(language) = std::env::var("SSMP_SMOKE_LANGUAGE") {
                 app.state.preferences.language = language;
             }
+            if let Ok(scale) = std::env::var("SSMP_SMOKE_SCALE")
+                .ok()
+                .unwrap_or_default()
+                .parse::<f32>()
+            {
+                app.state.preferences.scale = scale.clamp(0.8, 1.5);
+                app.apply_preferences(ctx);
+            }
             if let Ok(theme) = std::env::var("SSMP_SMOKE_THEME") {
                 app.set_theme(&theme, ctx);
             }
@@ -496,6 +557,23 @@ impl App {
                 .map(ssmp::music::album_key);
             if app.smoke_page.as_deref() == Some("edit") {
                 app.edit = app.current();
+            }
+            match app.smoke_page.as_deref() {
+                Some("stats-month") => app.report_kind = 1,
+                Some("stats-year") => app.report_kind = 2,
+                Some("lyrics-queue") => app.state.preferences.show_queue = true,
+                Some("bulk") => {
+                    app.select_mode = true;
+                    app.selected_songs = app
+                        .rows
+                        .iter()
+                        .filter(|m| m.kind == "audio")
+                        .take(3)
+                        .map(|m| m.id.clone())
+                        .collect();
+                    app.begin_bulk_edit();
+                }
+                _ => (),
             }
         }
         app.apply_audio_preferences();
@@ -518,6 +596,7 @@ impl App {
         self.error = error;
     }
     fn changed(&mut self) {
+        self.report_cache = None;
         self.filtered_cache.get_mut().take();
         self.genre_cache.get_mut().take();
         self.dirty = true;
@@ -535,6 +614,12 @@ impl App {
             .get(self.state.queue_index)
             .and_then(|id| self.library().iter().find(|m| &m.id == id))
             .cloned()
+            .map(|mut m| {
+                if let Some(text) = self.state.lyrics_overrides.get(&m.id) {
+                    m.lyrics = text.clone();
+                }
+                m
+            })
     }
     fn import_paths(&mut self, paths: Vec<PathBuf>) {
         if self.remote.is_some() {
@@ -721,7 +806,17 @@ impl App {
     }
     fn process_events(&mut self, ctx: &egui::Context) {
         while let Ok(event) = self.rx.try_recv() {
-            self.busy = self.busy.saturating_sub(1);
+            if let Event::UpdateProgress(done, total) = &event {
+                self.update_progress = Some((*done, *total));
+                continue;
+            }
+            if let Event::MetadataProgress(done, total, title) = &event {
+                self.metadata_progress = Some((*done, *total, title.clone()));
+                continue;
+            }
+            if !matches!(&event, Event::UpdateChecked(_) | Event::UpdateDownloaded(_)) {
+                self.busy = self.busy.saturating_sub(1);
+            }
             if let Event::Watched(Ok((_, signature))) = &event {
                 if *signature == self.watch_signature {
                     self.watch_running = false;
@@ -731,6 +826,41 @@ impl App {
             self.filtered_cache.get_mut().take();
             self.genre_cache.get_mut().take();
             match event {
+                Event::UpdateProgress(..) => unreachable!(),
+                Event::UpdateChecked(result) => {
+                    self.update_busy = false;
+                    match result {
+                        Ok(Some(release)) => {
+                            self.update_status =
+                                format!("{}: {}", self.t("Update available"), release.version);
+                            self.update_offer = Some(release);
+                            if self.state.preferences.automatic_updates {
+                                self.download_app_update();
+                            }
+                        }
+                        Ok(None) => self.update_status = self.t("You are up to date").into(),
+                        Err(e) => {
+                            self.update_status =
+                                format!("{}: {e}", self.t("Update check unavailable"))
+                        }
+                    }
+                    if self.update_manual {
+                        self.notify(self.update_status.clone(), false);
+                    }
+                }
+                Event::UpdateDownloaded(result) => {
+                    self.update_busy = false;
+                    match result {
+                        Ok(()) => {
+                            self.update_status = self.t("Ready to install after closing").into();
+                            self.notify(self.update_status.clone(), false);
+                        }
+                        Err(e) => {
+                            self.update_status =
+                                format!("{}: {e}", self.t("Update download failed"))
+                        }
+                    }
+                }
                 Event::Watched(result) => {
                     self.watch_running = false;
                     match result {
@@ -747,33 +877,14 @@ impl App {
                         Err(e) => self.notify(e, true),
                     }
                 }
+                Event::MetadataProgress(..) => unreachable!(),
                 Event::Enriched(result) => {
                     self.metadata_running = false;
                     match result {
-                        Ok(rows) => {
-                            let mut n = 0;
-                            for enriched in rows {
-                                if let Ok(Some(current)) = self.store.get(&enriched.id) {
-                                    if !current.locked
-                                        && self.state.preferences.online_metadata
-                                        && self.remote.is_none()
-                                    {
-                                        let merged =
-                                            ssmp::metadata::merge_missing(&current, &enriched);
-                                        let _ = self.store.put(&merged);
-                                        n += 1;
-                                    }
-                                }
-                            }
-                            self.rows = self.store.media().unwrap_or_default();
-                            if n > 0 {
-                                self.notify(format!("{} · {n}", self.t("Metadata checked")), false);
-                                self.last_metadata = Instant::now() - Duration::from_secs(300);
-                            }
-                        }
+                        Ok(batch) => self.accept_metadata(batch),
                         Err(e) => self.notify(
                             format!("{}: {e}", self.t("Metadata lookup unavailable")),
-                            false,
+                            true,
                         ),
                     }
                 }
@@ -860,18 +971,34 @@ impl App {
                     }
                     Err(e) => self.notify(e, true),
                 },
-                Event::Lyrics(r) => match r {
-                    Ok((id, text)) => {
-                        if let Ok(Some(mut m)) = self.store.get(&id) {
-                            m.lyrics = text;
-                            m.locked = true;
-                            let _ = self.store.put(&m);
-                            self.rows = self.store.media().unwrap_or_default();
-                            self.notify("Lyrics saved in your library", false)
+                Event::Lyrics(r) => {
+                    self.lyrics_pending = None;
+                    match r {
+                        Ok((id, text, original)) => {
+                            let current = self
+                                .edit
+                                .as_ref()
+                                .filter(|m| m.id == id)
+                                .cloned()
+                                .or_else(|| self.library().iter().find(|m| m.id == id).cloned());
+                            let unchanged = current.as_ref().is_some_and(|m| m.lyrics == original)
+                                && self
+                                    .state
+                                    .lyrics_overrides
+                                    .get(&id)
+                                    .is_none_or(|v| v == &original);
+                            if unchanged {
+                                self.apply_lyrics(&id, text);
+                            } else {
+                                self.notify(
+                                    "Lyrics changed while searching. Your edits were kept.",
+                                    false,
+                                );
+                            }
                         }
+                        Err(e) => self.notify(e, true),
                     }
-                    Err(e) => self.notify(e, true),
-                },
+                }
             }
         }
     }
@@ -1009,44 +1136,26 @@ impl App {
         response
     }
     fn lookup_lyrics(&mut self, m: &Media) {
-        if m.artist.is_empty() {
+        if self.lyrics_pending.is_some() {
+            return;
+        }
+        if m.artist.trim().is_empty() {
             self.notify(
                 "Add the artist in Edit information before searching lyrics",
                 true,
             );
             return;
         }
+        self.lyrics_pending = Some(m.id.clone());
+        self.busy += 1;
+        self.notify("Searching lyrics…", false);
         let m = m.clone();
         let tx = self.tx.clone();
-        self.busy += 1;
-        self.notify("Searching LRCLIB for matching lyrics…", false);
         std::thread::spawn(move || {
-            let result = (|| -> Result<_> {
-                let client = reqwest::blocking::Client::builder()
-                    .timeout(Duration::from_secs(15))
-                    .user_agent("SSMP/0.2 (https://github.com/Slulisee/SSMP)")
-                    .build()?;
-                let v: serde_json::Value = client
-                    .get("https://lrclib.net/api/get")
-                    .query(&[
-                        ("artist_name", m.artist.as_str()),
-                        ("track_name", m.title.as_str()),
-                        ("album_name", m.album.as_str()),
-                        ("duration", &m.duration.round().to_string()),
-                    ])
-                    .send()?
-                    .error_for_status()?
-                    .json()?;
-                let text = v["syncedLyrics"]
-                    .as_str()
-                    .filter(|s| !s.trim().is_empty())
-                    .or_else(|| v["plainLyrics"].as_str())
-                    .context("No matching lyrics are available")?;
-                Ok((m.id, text.to_string()))
-            })();
-            let _ = tx.send(Event::Lyrics(
-                result.map_err(|e| format!("Lyrics lookup: {e}")),
-            ));
+            let result = ssmp::metadata::lyrics(&m)
+                .map(|text| (m.id, text, m.lyrics))
+                .map_err(|e| format!("Lyrics lookup: {e}"));
+            let _ = tx.send(Event::Lyrics(result));
         });
     }
     fn save_metadata(&mut self, mut m: Media) {
@@ -1147,16 +1256,17 @@ impl App {
         if !self.lyrics_fullscreen {
             self.sidebar(ctx);
         }
-        if self.state.preferences.show_queue && self.page != Page::Lyrics {
+        if self.state.preferences.show_queue {
             self.queue_panel(ctx);
         }
         self.central(ctx, frame);
         self.music_dialogs(ctx);
+        self.bulk_edit_dialog(ctx);
         if self.smoke {
             let keep = std::env::var("SSMP_SMOKE_KEEP_OPEN").is_ok_and(|v| v == "1");
             if keep && self.qa_last_trace.elapsed() > Duration::from_millis(100) {
                 self.qa_last_trace = Instant::now();
-                let proof = serde_json::json!({"at":ssmp::now(),"position":self.player.as_ref().map(|p|p.snapshot.position),"paused":self.player.as_ref().map(|p|p.snapshot.paused),"path":self.player.as_ref().map(|p|p.snapshot.path.clone()),"error":self.player.as_ref().map(|p|p.snapshot.error.clone()),"seek_commands":self.player.as_ref().map(|p|p.seek_commands),"shuffle":self.state.preferences.shuffle,"queue_index":self.state.queue_index,"playlist_count":self.state.playlists.len(),"page":self.page.title(),"video_visible":self.state.preferences.show_music_video,"preview":self.seek_preview});
+                let proof = serde_json::json!({"at":ssmp::now(),"position":self.player.as_ref().map(|p|p.snapshot.position),"paused":self.player.as_ref().map(|p|p.snapshot.paused),"path":self.player.as_ref().map(|p|p.snapshot.path.clone()),"error":self.player.as_ref().map(|p|p.snapshot.error.clone()),"seek_commands":self.player.as_ref().map(|p|p.seek_commands),"shuffle":self.state.preferences.shuffle,"queue_index":self.state.queue_index,"playlist_count":self.state.playlists.len(),"page":self.page.title(),"video_visible":self.state.preferences.show_music_video,"preview":self.seek_preview,"repeat":self.repeat,"queue_visible":self.state.preferences.show_queue,"scale":self.state.preferences.scale,"scale_preview":self.scale_preview,"selected_songs":self.selected_songs.len(),"lyrics_pending":self.lyrics_pending,"metadata_running":self.metadata_running});
                 let _ = std::fs::write(
                     self.store.root.join("interaction.json"),
                     serde_json::to_vec_pretty(&proof).unwrap(),
@@ -1229,6 +1339,22 @@ impl App {
         if let Some(p) = self.player.as_mut() {
             p.close(gl);
         }
+        if !self.smoke
+            && cfg!(windows)
+            && (self.state.preferences.automatic_updates || self.update_apply_once)
+        {
+            if let Some(home) = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(PathBuf::from))
+            {
+                if let Err(e) = ssmp::updates::launch_pending(&self.store.root, &home) {
+                    let _ = std::fs::write(
+                        self.store.root.join("updates/last-error.txt"),
+                        e.to_string(),
+                    );
+                }
+            }
+        }
     }
 }
 impl eframe::App for App {
@@ -1243,6 +1369,85 @@ impl eframe::App for App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn explicit_metadata_and_lyrics_replies_are_visible_with_automatic_lookup_off() {
+        let directory = tempfile::tempdir().unwrap();
+        let media = Media {
+            id: "reply-track".into(),
+            path: "fixture.wav".into(),
+            title: "Track".into(),
+            artist: "Artist".into(),
+            kind: "audio".into(),
+            locked: true,
+            tag_version: 2,
+            ..Default::default()
+        };
+        Store::open(directory.path()).unwrap().put(&media).unwrap();
+        let ctx = egui::Context::default();
+        let mut app =
+            App::new_context(&ctx, None, None, directory.path().into(), true, None).unwrap();
+        app.state.preferences.online_metadata = false;
+        let mut online = media.clone();
+        online.genre = "pop".into();
+        app.tx
+            .send(Event::Enriched(Ok(enhancements::MetadataBatch {
+                rows: vec![online],
+                errors: vec![],
+                explicit: true,
+            })))
+            .unwrap();
+        app.process_events(&ctx);
+        assert_eq!(app.rows[0].genre, "pop");
+        assert!(app.rows[0].locked);
+        app.lyrics_pending = Some(media.id.clone());
+        app.tx
+            .send(Event::Lyrics(Ok((
+                media.id.clone(),
+                "[00:00]Fixture lyrics".into(),
+                String::new(),
+            ))))
+            .unwrap();
+        app.process_events(&ctx);
+        assert!(app.lyrics_pending.is_none());
+        assert!(app.rows[0].lyrics.contains("Fixture lyrics"));
+        app.tx
+            .send(Event::Lyrics(Ok((
+                media.id.clone(),
+                "late overwrite".into(),
+                String::new(),
+            ))))
+            .unwrap();
+        app.process_events(&ctx);
+        assert_ne!(app.rows[0].lyrics, "late overwrite");
+        app.tx
+            .send(Event::Lyrics(Err("Lookup failed fixture".into())))
+            .unwrap();
+        app.process_events(&ctx);
+        assert!(app.error);
+        assert!(app.status.contains("Lookup failed"));
+        app.close_window(None);
+    }
+    #[test]
+    fn selection_ranges_do_not_change_the_playing_queue() {
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app =
+            App::new_context(&ctx, None, None, directory.path().into(), true, None).unwrap();
+        let rows: Vec<_> = (0..5)
+            .map(|n| Media {
+                id: format!("song-{n}"),
+                ..Default::default()
+            })
+            .collect();
+        let queue = app.state.queue.clone();
+        app.select_song("song-1", &rows, false);
+        app.select_song("song-4", &rows, true);
+        assert_eq!(app.selected_songs.len(), 4);
+        assert_eq!(app.state.queue, queue);
+        app.select_song("song-2", &rows, false);
+        assert_eq!(app.selected_songs.len(), 3);
+        app.close_window(None);
+    }
 
     #[test]
     fn metadata_edits_immediately_refresh_cached_search_results() {

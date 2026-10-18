@@ -4,11 +4,12 @@ Prepare with SSMP_PROFILE=1 and scripts/music_interactions.py, then minimize
 the generated test window through Computer Use before running this check.
 """
 from pathlib import Path
-import hashlib,json,sqlite3,time
+import hashlib,json,sqlite3,time,tomllib
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/'qa/music-interactive'
-EXE=ROOT/'dist/SSMP-0.2.0-windows-x64/SSMP.exe'
+VERSION=tomllib.loads((ROOT/'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
+EXE=ROOT/f'dist/SSMP-{VERSION}-windows-x64/SSMP.exe'
 
 def sample():
     with sqlite3.connect(DATA/'library.sqlite3') as db:

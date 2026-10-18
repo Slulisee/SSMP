@@ -13,6 +13,7 @@ pub enum Icon {
     Play,
     Pause,
     Repeat,
+    RepeatOne,
     More,
     Queue,
     Volume,
@@ -131,9 +132,13 @@ pub fn draw(p: &egui::Painter, rect: egui::Rect, icon: Icon, color: Color32) {
             path(&[(0.76, 0.02), (0.96, 0.18), (0.76, 0.34)]);
             path(&[(0.76, 0.66), (0.96, 0.82), (0.76, 0.98)]);
         }
-        Icon::Repeat => {
+        Icon::Repeat | Icon::RepeatOne => {
             path(&[(0.12, 0.56), (0.12, 0.23), (0.9, 0.23), (0.72, 0.05)]);
             path(&[(0.9, 0.42), (0.9, 0.78), (0.1, 0.78), (0.28, 0.96)]);
+            if matches!(icon, Icon::RepeatOne) {
+                path(&[(0.43, 0.44), (0.52, 0.37), (0.52, 0.65)]);
+                line((0.43, 0.65), (0.61, 0.65));
+            }
         }
         Icon::More => {
             for x in [0.16, 0.5, 0.84] {

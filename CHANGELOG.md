@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-10-18
+
+- Add measured monthly/yearly listening stories, period rankings, activity patterns and replay playlists. Keep legacy totals and versioned JSON export without guessing missing history.
+- Distinguish repeat one, allow the queue beside lyrics, add lyric-file import and visible online-search progress/results with validated search fallback.
+- Put information lookup on the library, song menus, selection toolbar and editor. Keep curated genre lookup and sorting, protected edits and paced recoverable batches.
+- Add multi-selection and checked-field batch editing. Apply interface scaling on release and adapt navigation, player controls and dialogs to compact/high-scale windows.
+- Add per-user Windows setup/uninstall and verified stable background updates applied after closing, with an off switch.
+- Add Docker/Compose headless-host sources, health checks and persistent-data/update guidance. Continue the full-version roadmap without changing the CPU-rendered Windows default.
+
+
 ## 0.2.0 — Music player release
 
 - Restore the name Slulisee's Simple Music Player; keep music videos and remove general series/video UI.

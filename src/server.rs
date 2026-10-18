@@ -24,15 +24,18 @@ fn json(request: Request, status: u16, value: impl serde::Serialize) {
     );
 }
 fn body(request: &mut Request) -> Result<Vec<u8>> {
-    if request.body_length().is_some_and(|n| n > 2 * 1024 * 1024) {
+    body_limit(request, 2 * 1024 * 1024)
+}
+fn body_limit(request: &mut Request, limit: usize) -> Result<Vec<u8>> {
+    if request.body_length().is_some_and(|n| n > limit) {
         bail!("Request body too large")
     }
     let mut bytes = Vec::new();
     request
         .as_reader()
-        .take(2 * 1024 * 1024 + 1)
+        .take(limit as u64 + 1)
         .read_to_end(&mut bytes)?;
-    if bytes.len() > 2 * 1024 * 1024 {
+    if bytes.len() > limit {
         bail!("Request body too large")
     }
     Ok(bytes)
@@ -263,7 +266,8 @@ fn handle(mut request: Request, root: &Path, failures: Failures) {
         },
         ("PUT", "/api/v1/state") => {
             let result = (|| -> Result<UserState> {
-                let mut state: UserState = serde_json::from_slice(&body(&mut request)?)?;
+                let mut state: UserState =
+                    serde_json::from_slice(&body_limit(&mut request, 16 * 1024 * 1024)?)?;
                 state.roots.clear();
                 store.compare_save(&user, &mut state)?;
                 Ok(state)

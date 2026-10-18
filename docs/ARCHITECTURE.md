@@ -63,3 +63,10 @@ ListeningClock accumulates wall time across quantized audio clock updates. Seek/
 Folder signatures and scans run on workers. The server reads host-owned local roots separately from authenticated profile state and scans on a background worker. `--watch PATH --serve` configures headless discovery. Automatic metadata is disabled by default and runs serially, with MusicBrainz spacing and cached provider replies. Delayed results merge onto the latest unlocked library record.
 
 Run `scripts/music_playback_qa.py` for real seek/error/link-video checks and `scripts/music_ui_qa.py` for music screens, languages and sizes. `scripts/music_interactions.py` prepares disposable long tracks for native pointer/keyboard checks. `scripts/package_music.py` packages the reviewed Git index, so unrelated workspace edits cannot silently enter a source archive.
+
+
+## Music 0.3
+
+`stats.rs` aggregates calendar-month track seconds, qualified plays, hours and playlist time into period reports. The old all-time/daily fields remain available. `stats_detail_since` marks the reliable breakdown boundary; unavailable historical rankings are not fabricated. Exports use schema 2 with the original all-time keys. Large authenticated profile saves have a 16 MiB bound, while other request bodies retain 2 MiB limits. The revision transaction preserves period data when a 0.2 client saves ordinary changes; an explicit history reset still clears it.
+
+`ui/enhancements.rs` owns selection, atomic local batch edits and paced explicit/automatic metadata jobs. Results rebase on current values. `ui/report_ui.rs` renders the wrap-up and rankings, caching reports. `ui/update_ui.rs` and `updates.rs` check fixed stable-release URLs and verified installer identities in workers; Windows setup waits for running instances/hosts. Installer payload/uninstall lists contain only app-owned files. User media is never recursively removed. `Dockerfile` builds the existing headless binary with no desktop/media-renderer dependency.

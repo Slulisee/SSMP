@@ -1,8 +1,16 @@
-# SSMP 0.2 release status
+# SSMP 0.3 release status
 
-This release is a runnable Windows music-player update. The accepted scope is in [the specification](docs/MUSIC-0.2-SPEC.md), with operation in [the music guide](docs/MUSIC-GUIDE.md). Exact commands and exit results accompany the local delivery in MUSIC-VERIFICATION.txt and qa/ evidence.
+This release is a runnable Windows music-player update. The accepted scope is in [the specification](docs/MUSIC-0.3-SPEC.md), with operation in [the music guide](docs/MUSIC-GUIDE.md). Exact commands and exit results accompany the local delivery in MUSIC-VERIFICATION.txt and qa/ evidence.
 
-## Implemented
+## 0.3 additions
+
+- Monthly/yearly measured wrap-ups, versioned exports and replay playlists.
+- Direct metadata/genre lookup, visible lyric lookup/import, queue beside lyrics, repeat-one indicator and checked-field multi-selection edits.
+- Scaling on release, compact/high-scale navigation/player layout and smaller scrollable dialogs.
+- Per-user Windows setup/uninstall, verified stable automatic updates after closing, and an off switch.
+- Docker/Compose headless-host build, data volumes and health/update instructions.
+
+## Existing implemented foundation
 
 - Music-focused navigation, artists/albums, music videos, favorites, local/offline libraries and personal hosting. General series/episode/subtitle screens have been removed.
 - Preview-on-drag/seek-on-release, previous/restart threshold, independent shuffle mode, weighted favorite artists, repeat, error recovery, output selection and normalization.

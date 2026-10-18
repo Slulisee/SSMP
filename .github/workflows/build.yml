@@ -1,0 +1,100 @@
+name: Build and verify SSMP
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing draft release tag to receive verified installers
+        required: false
+      publish:
+        description: Publish the draft after all checks pass
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      RUSTFLAGS: -C target-feature=+crt-static
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Rust toolchain and tests
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          cargo test --locked
+          cargo build --release --locked
+      - name: Pinned media runtime and generated QA media
+        run: |
+          python -m pip install pillow==12.3.0
+          python scripts/prepare_music_runtime.py
+          python scripts/prepare_qa.py
+      - name: Native playback and feedback regression pages
+        run: |
+          python scripts/music_playback_qa.py
+          python scripts/music_v03_qa.py
+          python scripts/qa.py
+      - name: Setup compiler
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'C:/Program Files (x86)/NSIS/makensis.exe')) { choco install nsis --no-progress -y }
+      - name: Build and test setup
+        run: |
+          python scripts/build_music_installer.py
+          python scripts/test_music_installer.py
+      - name: Portable archive and checksums
+        shell: pwsh
+        run: |
+          python scripts/zip_music_runtime.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SSMP-Windows-AMD64
+          path: |
+            dist/SSMP-Windows-AMD64-Setup.exe*
+            dist/SSMP-*-windows-x64.zip*
+            qa/music-installer-results.json
+          if-no-files-found: error
+  host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Headless Rust checks
+        run: |
+          rustup update stable --no-self-update
+          cargo test --locked --no-default-features
+      - name: Docker host image and health check
+        run: |
+          docker build -t ssmp-qa:current .
+          docker run --rm ssmp-qa:current --version
+          docker run -d --name ssmp-qa -p 127.0.0.1:4534:4534 ssmp-qa:current
+          for attempt in $(seq 1 30); do curl -fsS http://127.0.0.1:4534/api/v1/health && break || sleep 1; done
+          curl -fsS http://127.0.0.1:4534/api/v1/health
+          docker rm -fv ssmp-qa
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: [windows, host]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Attach verified files, then publish the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" release-assets/*
+          gh release edit "$RELEASE_TAG" --draft=false --latest

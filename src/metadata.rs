@@ -132,9 +132,13 @@ pub fn enrich(store: &Store, media: &Media) -> Result<Media> {
     if m.locked {
         return Ok(m);
     }
+    anyhow::ensure!(
+        !m.artist.trim().is_empty(),
+        "Add the artist in Edit information before searching online"
+    );
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(12))
-        .user_agent("SSMP/0.2.0 (https://github.com/Slulisee/SSMP)")
+        .user_agent("SSMP/0.3.0 (https://github.com/Slulisee/SSMP)")
         .build()?;
     let cache = store.root.join("metadata-cache");
     std::fs::create_dir_all(&cache)?;
@@ -217,7 +221,10 @@ pub fn enrich(store: &Store, media: &Media) -> Result<Media> {
         if let Some(id) = release
             .filter(|id| id.len() == 36 && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
         {
-            if let Ok(r) = client
+            let cached = store.root.join("artwork").join(format!("mb-{id}.jpg"));
+            if cached.is_file() {
+                m.artwork = cached.to_string_lossy().into_owned();
+            } else if let Ok(r) = client
                 .get(format!(
                     "https://coverartarchive.org/release/{id}/front-250"
                 ))
@@ -291,12 +298,22 @@ pub fn merge_missing(current: &Media, online: &Media) -> Media {
     m
 }
 
+/// An explicit request may fill empty fields on a manually edited track, but
+/// never replaces its nonempty values or clears its rescan protection.
+pub fn merge_requested(current: &Media, online: &Media) -> Media {
+    let mut base = current.clone();
+    base.locked = false;
+    let mut merged = merge_missing(&base, online);
+    merged.locked = current.locked;
+    merged
+}
+
 pub fn lyrics(track: &Media) -> Result<String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
-        .user_agent("SSMP/0.2.0 (https://github.com/Slulisee/SSMP)")
+        .user_agent("SSMP/0.3.0 (https://github.com/Slulisee/SSMP)")
         .build()?;
-    let v: Value = client
+    let response = client
         .get("https://lrclib.net/api/get")
         .query(&[
             ("track_name", track.title.clone()),
@@ -304,20 +321,100 @@ pub fn lyrics(track: &Media) -> Result<String> {
             ("album_name", track.album.clone()),
             ("duration", track.duration.round().to_string()),
         ])
+        .send()?;
+    if response.status().is_success() {
+        let value: Value = response.json()?;
+        if let Some(text) = lyrics_text(&value) {
+            return Ok(text);
+        }
+    }
+    // Local album names often differ from LRCLIB's release. Search without
+    // that constraint, then validate identity and duration before accepting.
+    let values: Value = client
+        .get("https://lrclib.net/api/search")
+        .query(&[("track_name", &track.title), ("artist_name", &track.artist)])
         .send()?
         .error_for_status()?
         .json()?;
-    Ok(v["syncedLyrics"]
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .or_else(|| v["plainLyrics"].as_str())
-        .context("No matching lyrics")?
-        .to_string())
+    choose_lyrics(track, &values).context(
+        "No matching lyrics found. Check the title and artist, or add a local lyrics file.",
+    )
+}
+
+fn lyrics_text(value: &Value) -> Option<String> {
+    ["syncedLyrics", "plainLyrics"]
+        .into_iter()
+        .filter_map(|k| value[k].as_str())
+        .find(|s| !s.trim().is_empty())
+        .map(String::from)
+}
+pub fn choose_lyrics(track: &Media, values: &Value) -> Option<String> {
+    let mut candidates: Vec<_> = values
+        .as_array()?
+        .iter()
+        .filter(|v| {
+            normalized(&text(&v["trackName"])) == normalized(&track.title)
+                && normalized(&text(&v["artistName"])) == normalized(&track.artist)
+                && (track.duration <= 0.
+                    || v["duration"]
+                        .as_f64()
+                        .is_some_and(|d| (d - track.duration).abs() <= 5.))
+                && lyrics_text(v).is_some()
+        })
+        .collect();
+    candidates.sort_by_key(|v| {
+        (
+            v["syncedLyrics"]
+                .as_str()
+                .is_none_or(|s| s.trim().is_empty()),
+            normalized(&text(&v["albumName"])) != normalized(&track.album),
+        )
+    });
+    candidates.first().and_then(|v| lyrics_text(v))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn lyric_search_checks_identity_duration_and_prefers_synced() {
+        let track = Media {
+            title: "Track".into(),
+            artist: "Artist".into(),
+            duration: 180.,
+            ..Default::default()
+        };
+        let values = serde_json::json!([
+            {"trackName":"Track","artistName":"Wrong","duration":180.,"syncedLyrics":"wrong"},
+            {"trackName":"Track","artistName":"Artist","duration":230.,"syncedLyrics":"wrong version"},
+            {"trackName":"Track","artistName":"Artist","duration":180.,"plainLyrics":"plain"},
+            {"trackName":"Track","artistName":"Artist","duration":181.,"syncedLyrics":"[00:01]right"}]);
+        assert_eq!(
+            choose_lyrics(&track, &values).as_deref(),
+            Some("[00:01]right")
+        );
+        assert!(choose_lyrics(&track, &serde_json::json!([])).is_none());
+    }
+    #[test]
+    fn manual_online_request_fills_only_missing_fields() {
+        let current = Media {
+            locked: true,
+            album: "My album".into(),
+            lyrics: "My lyrics".into(),
+            ..Default::default()
+        };
+        let online = Media {
+            genre: "pop".into(),
+            album: "Other album".into(),
+            lyrics: "Other lyrics".into(),
+            ..Default::default()
+        };
+        let merged = merge_requested(&current, &online);
+        assert!(merged.locked);
+        assert_eq!(merged.genre, "pop");
+        assert_eq!(merged.album, "My album");
+        assert_eq!(merged.lyrics, "My lyrics");
+    }
     #[test]
     fn decades_and_arbitrary_tags_are_not_genres() {
         assert_eq!(

@@ -74,6 +74,7 @@ pub struct Preferences {
     pub shuffle: bool,
     pub weight_favorite_artists: bool,
     pub design_version: u32,
+    pub automatic_updates: bool,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -101,6 +102,7 @@ impl Default for Preferences {
             shuffle: false,
             weight_favorite_artists: true,
             design_version: 0,
+            automatic_updates: true,
         }
     }
 }
@@ -143,6 +145,10 @@ pub struct UserState {
     pub listening_days: BTreeMap<u64, f64>,
     pub listening_hours: BTreeMap<u64, f64>,
     pub stats_since: u64,
+    pub stats_detail_since: u64,
+    pub months: BTreeMap<u32, crate::stats::MonthStats>,
+    pub first_heard: BTreeMap<String, u64>,
+    pub lyrics_overrides: BTreeMap<String, String>,
 }
 impl UserState {
     pub fn favorite(&mut self, id: &str) {
@@ -162,6 +168,13 @@ impl UserState {
                 self.history.drain(..self.history.len() - 10000);
             }
             *self.counts.entry(id.into()).or_default() += 1;
+            *self
+                .months
+                .entry(crate::stats::month_key(crate::now()))
+                .or_default()
+                .plays
+                .entry(id.into())
+                .or_default() += 1;
         }
     }
     pub fn clear_history(&mut self) {
@@ -171,6 +184,9 @@ impl UserState {
         self.listening_days.clear();
         self.listening_hours.clear();
         self.stats_since = 0;
+        self.stats_detail_since = 0;
+        self.months.clear();
+        self.first_heard.clear();
         for playlist in &mut self.playlists {
             playlist.listening_seconds = 0.;
         }
@@ -183,7 +199,16 @@ impl UserState {
         if self.stats_since == 0 {
             self.stats_since = at;
         }
+        if self.stats_detail_since == 0 {
+            self.stats_detail_since = at;
+        }
+        if !self.listening_seconds.contains_key(id) {
+            self.first_heard.entry(id.into()).or_insert(at);
+        }
         *self.listening_seconds.entry(id.into()).or_default() += seconds;
+        let month = self.months.entry(crate::stats::month_key(at)).or_default();
+        *month.seconds.entry(id.into()).or_default() += seconds;
+        month.hours[(at / 3600 % 24) as usize] += seconds;
         *self.listening_days.entry(at / 86400).or_default() += seconds;
         *self.listening_hours.entry(at / 3600 % 24).or_default() += seconds;
         if let Some(playlist_id) = &self.queue_playlist {
@@ -193,6 +218,7 @@ impl UserState {
                 .find(|p| &p.id == playlist_id && p.items.iter().any(|v| v == id))
             {
                 p.listening_seconds += seconds;
+                *month.playlists.entry(playlist_id.clone()).or_default() += seconds;
             }
         }
     }

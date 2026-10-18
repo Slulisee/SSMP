@@ -81,10 +81,53 @@ fn run() -> Result<()> {
     }
     if let Some(id) = value(&args, "--enrich") {
         let media = store.get(&id)?.context("Unknown media")?;
-        let online = ssmp::metadata::enrich(&store, &media)?;
-        let merged = ssmp::metadata::merge_missing(&media, &online);
+        let mut lookup = media.clone();
+        lookup.locked = false;
+        let online = ssmp::metadata::enrich(&store, &lookup)?;
+        let merged = ssmp::metadata::merge_requested(&media, &online);
         store.put(&merged)?;
         println!("{}", serde_json::to_string_pretty(&merged)?);
+        return Ok(());
+    }
+    if let Some(id) = value(&args, "--find-lyrics") {
+        let mut media = store.get(&id)?.context("Unknown media")?;
+        media.lyrics = ssmp::metadata::lyrics(&media)?;
+        media.locked = true;
+        store.put(&media)?;
+        println!("{}", serde_json::to_string_pretty(&media)?);
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--statistics") {
+        let period = if let Some(month) = value(&args, "--month") {
+            let (y, m) = month.split_once('-').context("Use YYYY-MM")?;
+            let (y, m) = (y.parse::<u32>()?, m.parse::<u32>()?);
+            anyhow::ensure!(
+                (1970..=9998).contains(&y) && (1..=12).contains(&m),
+                "Invalid calendar month"
+            );
+            ssmp::stats::Period::Month(y, m)
+        } else if let Some(y) = value(&args, "--year") {
+            let y = y.parse::<u32>()?;
+            anyhow::ensure!((1970..=9998).contains(&y), "Invalid year");
+            ssmp::stats::Period::Year(y)
+        } else {
+            ssmp::stats::Period::AllTime
+        };
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&ssmp::stats::report(
+                &store.state("local")?,
+                &store.media()?,
+                period
+            ))?
+        );
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--check-app-updates") {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&ssmp::updates::check()?)?
+        );
         return Ok(());
     }
     #[cfg(feature = "desktop")]
@@ -114,6 +157,8 @@ fn run() -> Result<()> {
         return Ok(());
     }
     if args.iter().any(|s| s == "--serve") {
+        #[cfg(windows)]
+        let _host_guard = ssmp::updates::AppMutex::hold();
         return ssmp::server::serve(
             root,
             &value(&args, "--bind").unwrap_or_else(|| "127.0.0.1:4534".into()),

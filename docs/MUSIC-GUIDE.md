@@ -51,3 +51,16 @@ Manual edits are stored in the library and protected during rescans and automati
 Enable Watch my music folders for changes after choosing folders. Scans run in the background about every five seconds. New/changed files appear without restarting playback. Remove source stops watching that folder; existing library items stay available.
 
 A headless host can use `SSMP --data DATA --watch MUSIC_FOLDER --serve --bind 0.0.0.0:4534`. On Linux use the host executable built with `--no-default-features`. The configured folders belong to the host's local settings, separate from remote user profiles. See [HOSTING.md](HOSTING.md) for accounts, LAN/Tailscale and service setup. Linux/macOS/mobile platform status is recorded in [the release checklist](../RELEASE-CHECKLIST.md).
+
+
+## 0.3: summaries, selection and direct lookups
+
+Statistics has All time, Monthly wrap-up and Yearly wrap-up tabs. Choose the year/month, step through the five story cards and explore the measured rankings and listening calendar below. Make a replay playlist copies up to fifty available ranked songs. Export my statistics includes the selected period and preserves the original measurement fields for all-time exports (JSON schema 2). Periods use UTC. Older daily totals remain, but detailed period song rankings start with 0.3; coverage notes explain any gap.
+
+Select songs enables table checkboxes. Ctrl-click toggles a song and Shift selects a range. Select all visible uses the current table/filter. The toolbar offers checked-field editing, playlist creation/addition, queue additions, online lookup and removal from the current playlist. Batch changes affect only explicitly checked fields; an empty checked field clears its value. Original files remain untouched.
+
+Find information for all songs is in the library header. Individual song menus and Edit information have Find information online; a selection has the same action. These one-time requests work while recurring automatic metadata lookup is off. Progress and cancellation stay visible. Missing recording/artist genres are fetched from MusicBrainz and can be searched/sorted. Nonempty values and manual edits are kept. The owner edits shared server metadata; other profiles can keep their own local lyrics overrides.
+
+Lyrics and Edit information both offer Add lyrics file and Find lyrics online. UTF-8/BOM and UTF-16 LRC/text are accepted. Online results validate title, artist and duration, with a fallback when exact album matching fails. Progress/errors stay on the lyrics page. The queue remains usable beside lyrics; compact windows stack the lyric identity and text. Repeat one shows a 1 in the icon. Interface size previews while dragging and applies after release; compact navigation and a separate transport row support larger scales.
+
+See [UPDATES.md](UPDATES.md) for setup and the selected automatic-close update policy, and [DOCKER.md](DOCKER.md) for the headless host.

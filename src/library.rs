@@ -557,6 +557,40 @@ pub fn export_playlist(store: &Store, p: &Playlist, path: &Path) -> Result<()> {
     fs::write(path, text)?;
     Ok(())
 }
+pub fn read_lyrics_file(path: &Path) -> Result<String> {
+    let mut bytes = Vec::new();
+    File::open(path)?
+        .take(2 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > 2 * 1024 * 1024 {
+        bail!("Lyrics files must be smaller than 2 MiB");
+    }
+    let text = if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
+        if bytes.len() % 2 != 0 {
+            bail!("Invalid UTF-16 lyrics file");
+        }
+        let little = bytes[0] == 0xff;
+        let words: Vec<_> = bytes[2..]
+            .chunks_exact(2)
+            .map(|v| {
+                if little {
+                    u16::from_le_bytes([v[0], v[1]])
+                } else {
+                    u16::from_be_bytes([v[0], v[1]])
+                }
+            })
+            .collect();
+        String::from_utf16(&words)?
+    } else {
+        String::from_utf8(bytes)?
+            .trim_start_matches('\u{feff}')
+            .to_string()
+    };
+    if text.trim().is_empty() {
+        bail!("The lyrics file is empty");
+    }
+    Ok(text)
+}
 pub fn lyrics(text: &str) -> Vec<(f64, String)> {
     let mut rows = Vec::new();
     let mut offset = 0.;
@@ -605,6 +639,21 @@ pub fn lyrics(text: &str) -> Vec<(f64, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_lyrics_support_utf8_bom_utf16_and_reject_empty_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lyrics.lrc");
+        std::fs::write(&path, "\u{feff}[00:01.20]Grüße").unwrap();
+        assert_eq!(lyrics(&read_lyrics_file(&path).unwrap())[0].1, "Grüße");
+        let mut bytes = vec![0xff, 0xfe];
+        for word in "[00:02.00]Bonjour".encode_utf16() {
+            bytes.extend(word.to_le_bytes());
+        }
+        std::fs::write(&path, bytes).unwrap();
+        assert_eq!(lyrics(&read_lyrics_file(&path).unwrap())[0].0, 2.);
+        std::fs::write(&path, "  ").unwrap();
+        assert!(read_lyrics_file(&path).is_err());
+    }
     #[test]
     fn old_tag_records_are_refreshed_once_without_losing_edits() {
         let dir = tempfile::tempdir().unwrap();

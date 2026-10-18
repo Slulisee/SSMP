@@ -2,6 +2,8 @@ pub mod library;
 pub mod metadata;
 pub mod model;
 pub mod music;
+pub mod stats;
+pub mod updates;
 #[cfg(feature = "desktop")]
 pub mod player;
 pub mod server;

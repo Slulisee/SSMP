@@ -102,20 +102,22 @@ pub fn shuffled_next<R: Rng + ?Sized>(
     rows: &[Media],
     rng: &mut R,
 ) -> Option<usize> {
+    let favorite_artists: std::collections::HashSet<_> =
+        state.favorite_artists.iter().map(String::as_str).collect();
+    let favored: std::collections::HashSet<_> = if state.preferences.weight_favorite_artists {
+        rows.iter()
+            .filter(|m| favorite_artists.contains(m.artist.trim().to_lowercase().as_str()))
+            .map(|m| m.id.as_str())
+            .collect()
+    } else {
+        Default::default()
+    };
     let candidates: Vec<(usize, u32)> = state
         .queue
         .iter()
         .enumerate()
         .filter(|(i, _)| *i != state.queue_index)
-        .map(|(i, id)| {
-            let favored = state.preferences.weight_favorite_artists
-                && rows.iter().find(|m| &m.id == id).is_some_and(|m| {
-                    state
-                        .favorite_artists
-                        .contains(&m.artist.trim().to_lowercase())
-                });
-            (i, if favored { 3 } else { 1 })
-        })
+        .map(|(i, id)| (i, if favored.contains(id.as_str()) { 3 } else { 1 }))
         .collect();
     let sum: u32 = candidates.iter().map(|(_, w)| w).sum();
     if sum == 0 {
@@ -136,6 +138,7 @@ pub fn sort_tracks(rows: &mut [Media], key: &str, descending: bool) {
         let order = match key {
             "Title" => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
             "Artist" => a.artist.to_lowercase().cmp(&b.artist.to_lowercase()),
+            "Genre" => a.genre.to_lowercase().cmp(&b.genre.to_lowercase()),
             "Album" => a
                 .album
                 .to_lowercase()
