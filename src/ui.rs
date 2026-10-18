@@ -1394,6 +1394,7 @@ mod tests {
                 rows: vec![online],
                 errors: vec![],
                 explicit: true,
+                editor: false,
             })))
             .unwrap();
         app.process_events(&ctx);
@@ -1425,6 +1426,52 @@ mod tests {
         app.process_events(&ctx);
         assert!(app.error);
         assert!(app.status.contains("Lookup failed"));
+        app.close_window(None);
+    }
+    #[test]
+    fn editor_lookup_requires_save_and_late_results_respect_cancel() {
+        let directory = tempfile::tempdir().unwrap();
+        let media = Media {
+            id: "draft-track".into(),
+            path: "fixture.wav".into(),
+            title: "Original title".into(),
+            artist: "Original artist".into(),
+            kind: "audio".into(),
+            locked: true,
+            tag_version: 2,
+            ..Default::default()
+        };
+        Store::open(directory.path()).unwrap().put(&media).unwrap();
+        let ctx = egui::Context::default();
+        let mut app =
+            App::new_context(&ctx, None, None, directory.path().into(), true, None).unwrap();
+        let mut draft = media.clone();
+        draft.title = "Draft title".into();
+        draft.artist = "Draft artist".into();
+        app.edit = Some(draft.clone());
+        let mut online = draft;
+        online.genre = "pop".into();
+        app.accept_metadata(enhancements::MetadataBatch {
+            rows: vec![online.clone()],
+            errors: vec![],
+            explicit: true,
+            editor: true,
+        });
+        assert_eq!(app.edit.as_ref().unwrap().genre, "pop");
+        assert!(app.store.get(&media.id).unwrap().unwrap().genre.is_empty());
+        assert_eq!(
+            app.store.get(&media.id).unwrap().unwrap().artist,
+            "Original artist"
+        );
+        app.edit = None;
+        app.accept_metadata(enhancements::MetadataBatch {
+            rows: vec![online],
+            errors: vec![],
+            explicit: true,
+            editor: true,
+        });
+        assert!(app.edit.is_none());
+        assert!(app.store.get(&media.id).unwrap().unwrap().genre.is_empty());
         app.close_window(None);
     }
     #[test]

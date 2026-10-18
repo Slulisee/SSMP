@@ -1325,7 +1325,7 @@ impl App {
             )
             .clicked()
         {
-            self.start_metadata_values(vec![m.clone()], true);
+            self.start_metadata_values(vec![m.clone()], true, false);
             ui.close();
         }
 
@@ -2943,7 +2943,7 @@ impl App {
                             )
                             .clicked()
                         {
-                            self.start_metadata_values(vec![m.clone()], true);
+                            self.start_metadata_values(vec![m.clone()], true, true);
                         }
                         if ui.button(self.t("Add lyrics file")).clicked() {
                             if let Some(text) = self.choose_lyrics_file() {

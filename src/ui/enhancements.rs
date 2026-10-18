@@ -5,6 +5,7 @@ pub(super) struct MetadataBatch {
     pub rows: Vec<Media>,
     pub errors: Vec<String>,
     pub explicit: bool,
+    pub editor: bool,
 }
 #[derive(Default)]
 pub(super) struct BulkEdit {
@@ -92,9 +93,9 @@ impl App {
             .filter(|m| wanted.contains(&m.id) && m.series.is_empty())
             .cloned()
             .collect();
-        self.start_metadata_values(rows, explicit);
+        self.start_metadata_values(rows, explicit, false);
     }
-    pub(super) fn start_metadata_values(&mut self, rows: Vec<Media>, explicit: bool) {
+    pub(super) fn start_metadata_values(&mut self, rows: Vec<Media>, explicit: bool, editor: bool) {
         if self.metadata_running {
             return;
         }
@@ -122,6 +123,7 @@ impl App {
                     rows: vec![],
                     errors: vec![],
                     explicit,
+                    editor,
                 };
                 for (index, mut m) in rows.into_iter().enumerate() {
                     if cancel.load(std::sync::atomic::Ordering::Relaxed) {
@@ -143,6 +145,23 @@ impl App {
         });
     }
     pub(super) fn accept_metadata(&mut self, batch: MetadataBatch) {
+        if batch.editor {
+            let checked = batch.rows.len();
+            let mut changed = 0;
+            for online in batch.rows {
+                if let Some(edit) = self.edit.as_mut().filter(|m| {
+                    m.id == online.id && m.title == online.title && m.artist == online.artist
+                }) {
+                    let merged = ssmp::metadata::merge_requested(edit, &online);
+                    changed += usize::from(
+                        serde_json::to_value(&*edit).ok() != serde_json::to_value(&merged).ok(),
+                    );
+                    *edit = merged;
+                }
+            }
+            self.metadata_notice(checked, changed, &batch.errors);
+            return;
+        }
         let mut updated = Vec::new();
         let mut changed = 0;
         if !batch.explicit && !self.state.preferences.online_metadata {
@@ -187,14 +206,17 @@ impl App {
         }
         self.filtered_cache.get_mut().take();
         self.genre_cache.get_mut().take();
+        self.metadata_notice(checked, changed, &batch.errors);
+    }
+    fn metadata_notice(&mut self, checked: usize, changed: usize, errors: &[String]) {
         let status = format!(
             "{}: {checked} · {}: {changed} · {}: {}",
             self.t("Metadata checked"),
             self.t("Updated"),
             self.t("Unavailable"),
-            batch.errors.len()
+            errors.len()
         );
-        if let Some(error) = batch.errors.first() {
+        if let Some(error) = errors.first() {
             self.notify(format!("{status}\n{error}"), true);
         } else {
             self.notify(status, false);
