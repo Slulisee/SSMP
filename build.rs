@@ -28,7 +28,7 @@ fn main() {
                 .unwrap_or_else(|| "C:/Program Files (x86)".into()),
         )
         .join("Windows Kits/10/bin");
-        let mut candidates: Vec<_> = std::fs::read_dir(kits)
+        let mut candidates: Vec<_> = std::fs::read_dir(&kits)
             .into_iter()
             .flatten()
             .flatten()
@@ -38,8 +38,23 @@ fn main() {
         candidates.sort();
         let compiler = candidates.pop().unwrap_or_else(|| "rc.exe".into());
         let output = output.with_extension("res");
-        let status = std::process::Command::new(compiler)
-            .arg("/nologo")
+        let mut command = std::process::Command::new(&compiler);
+        command.arg("/nologo");
+        // Cargo finds the MSVC linker itself; rc.exe still needs the SDK's
+        // header search paths when no developer-command prompt initialized it.
+        if let Some(version) = compiler
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+        {
+            if let Some(root) = kits.parent() {
+                let include = root.join("Include").join(version);
+                for component in ["um", "shared"] {
+                    command.arg("/I").arg(include.join(component));
+                }
+            }
+        }
+        let status = command
             .arg("/fo")
             .arg(&output)
             .arg("assets/SSMP.rc")
