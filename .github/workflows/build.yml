@@ -50,6 +50,7 @@ jobs:
         run: |
           python scripts/build_music_installer.py
           python scripts/test_music_installer.py
+          python scripts/music_update_wait_qa.py
       - name: Portable archive and checksums
         shell: pwsh
         run: |

@@ -99,7 +99,16 @@ def main():
             time.sleep(.3)
         records.append({'check':'headless host folder watching','result':'PASS'})
         before_inbox=len(json.loads(http(url+'/api/v1/library',token=owner)[2]))
-        for manifest in (QA/'e2e-data/imports').glob('*.json'):shutil.copy2(manifest,core/'imports'/manifest.name)
+        # A clean runner has no earlier downloader QA output. Exercise the same
+        # completed-file inbox protocol with a fresh media path outside watch.
+        handoff=RUN/'handoff';handoff.mkdir()
+        incoming=handoff/'Inbox.wav'
+        with wave.open(str(incoming),'wb')as file:
+            file.setparams((1,2,11025,0,'NONE','not compressed'))
+            file.writeframes(struct.pack('<h',37)*11025)
+        manifest=core/'imports/generated-handoff.tmp'
+        manifest.write_text(json.dumps({'version':1,'producer':'SSMD','items':[{'path':str(incoming.resolve()),'title':'Generated inbox handoff','artist':'SSMP Studio'}]}),encoding='utf-8')
+        manifest.replace(manifest.with_suffix('.json'))
         deadline=time.time()+8
         while len(json.loads(http(url+'/api/v1/library',token=owner)[2]))<before_inbox+1:
             assert time.time()<deadline,'Host inbox handoff was not consumed'
